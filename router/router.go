@@ -23,6 +23,7 @@ func NewRouter() *gin.Engine {
 	apiv1 := apiEngine.Group("api/v1")
 	{
 		apiv1.PUT("/devs", PutDevice)
+		apiv1.POST("/devs/discover", PostDevice)
 	}
 
 	// pushEngine := gin.New()

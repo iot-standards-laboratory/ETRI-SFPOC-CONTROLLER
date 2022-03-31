@@ -11,7 +11,9 @@ require (
 	github.com/gin-gonic/gin v1.7.7
 	github.com/gofrs/uuid v4.2.0+incompatible
 	github.com/gorilla/websocket v1.5.0
+	github.com/jacobsa/go-serial v0.0.0-20180131005756-15cf729a72d4
 	github.com/magiconair/properties v1.8.6
+	github.com/rjeczalik/notify v0.9.2
 	gorm.io/driver/sqlite v1.3.1
 	gorm.io/gorm v1.23.3
 )
