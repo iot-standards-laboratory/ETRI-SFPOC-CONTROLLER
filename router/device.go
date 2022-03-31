@@ -38,7 +38,7 @@ func PostDevice(c *gin.Context) {
 		if !b {
 			panic(errors.New("something went wrong"))
 		}
-		c.Status(http.StatusCreated)
+		c.String(http.StatusCreated, "OK")
 	case <-c.Request.Context().Done():
 		panic(errors.New("request is canceled"))
 	}

@@ -1,17 +1,16 @@
 package router
 
 import (
-	"etri-sfpoc-controller/model"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-var db model.DBHandlerI
+// var db model.DBHandlerI
 
 func init() {
 	var err error
-	db, err = model.NewSqliteHandler("dump.db")
+	// db, err = model.NewSqliteHandler("dump.db")
 	if err != nil {
 		panic(err)
 	}

@@ -15,20 +15,21 @@ var ch_discover chan notify.EventInfo
 var _managerObj *_manager
 var registerHandleFunc func(e Event)
 var removeHandleFunc func(e Event)
+var DevWithUUID = map[string]*_device{}
+var DevWithIface = map[interface{}]*_device{}
 
 func init() {
 	ctx, cancel = context.WithCancel(context.Background())
 	ch_discover = make(chan notify.EventInfo)
-	devWithUUID := map[string]*_device{}
-	devWithIface := map[interface{}]*_device{}
+
 	chanForSync := map[string]chan map[string]interface{}{}
 
 	_managerObj = &_manager{
-		devicesWithUUID:  devWithUUID,
-		devicesWithIface: devWithIface,
+		devicesWithUUID:  DevWithUUID,
+		devicesWithIface: DevWithIface,
 		chanForSync:      chanForSync,
-		SyncListener:     &SyncHandler{devices: devWithUUID, chanForSync: chanForSync, mutex: &sync.Mutex{}, states: map[string]map[string]interface{}{}},
-		RecvListener:     &RecvHandler{devices: devWithIface, chanForSync: chanForSync},
+		SyncListener:     &SyncHandler{devices: DevWithUUID, chanForSync: chanForSync, mutex: &sync.Mutex{}, states: map[string]map[string]interface{}{}},
+		RecvListener:     &RecvHandler{devices: DevWithIface, chanForSync: chanForSync},
 	}
 
 	registerHandleFunc = nil

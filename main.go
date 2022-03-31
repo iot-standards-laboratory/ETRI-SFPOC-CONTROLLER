@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/devmanage"
+	"etri-sfpoc-controller/devmanage/serialctrl"
+	"etri-sfpoc-controller/model"
 	"etri-sfpoc-controller/notifier"
 	"etri-sfpoc-controller/router"
 	"flag"
@@ -116,21 +118,74 @@ func register() (string, error) {
 
 	return payload["cid"].(string), nil
 }
+
+func deviceManagerSetup() {
+	serialctrl.AddRecvListener(serialctrl.NewEventHandler(func(e serialctrl.Event) {
+		param := e.Params()
+		fmt.Println("RECV: ", e.Params())
+		sid, err := model.DB.GetSID(param["sname"].(string))
+		if err != nil {
+			log.Println(err)
+		}
+
+		if sid == "not installed service" || sid == "not exist service" {
+			return
+		}
+
+		b, _ := json.Marshal(param)
+		req, err := http.NewRequest("PUT", "http://"+config.Params["serverAddr"].(string)+"/svc/"+sid+"/api/v1", bytes.NewReader(b))
+		if err != nil {
+			panic(err)
+		}
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			panic(err)
+		}
+
+		dec := json.NewDecoder(resp.Body)
+		var respObj map[string]interface{}
+		err = dec.Decode(&respObj)
+		if err != nil {
+			log.Println(err)
+		}
+		fmt.Println(respObj)
+
+		// serialctrl.Sync("DEVICE-A-UUID", map[string]interface{}{"ctrlValue": 100})
+	}))
+
+	serialctrl.AddRegisterHandleFunc(func(e serialctrl.Event) {
+		param := e.Params()
+		payload := map[string]interface{}{"sname": param["sname"], "dname": param["uuid"], "type": "sensor"}
+		fmt.Println("payload : ", payload)
+		respCh := make(chan bool)
+		go devmanage.RegisterDevice(payload, respCh)
+		<-respCh
+	})
+
+	serialctrl.AddRemoveHandleFunc(func(e serialctrl.Event) {
+		param := e.Params()
+		fmt.Println(param["uuid"].(string), " is removed!!")
+	})
+}
+
 func main() {
-	cid, _ := config.Params["cid"]
+	cid := config.Params["cid"].(string)
 	if cid == "blank" {
 		var err error
 		cid, err = register()
 		if err != nil {
 			panic(err)
 		}
-	} else {
-		fmt.Println("cid: ", cid)
 	}
 
 	run, cancel := devmanage.NewManager()
 	go run()
 	go router.NewRouter().Run(config.Params["bind"].(string))
-	subscribe(cid.(string))
+	deviceManagerSetup()
+	go serialctrl.Run()
+	subscribe(cid)
+
+	defer serialctrl.Close()
 	cancel()
 }

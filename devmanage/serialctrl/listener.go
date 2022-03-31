@@ -50,6 +50,7 @@ func compareMap(src map[string]interface{}, dst map[string]interface{}) bool {
 }
 
 func (sh *SyncHandler) Handle(e Event) {
+	fmt.Println("Sync")
 	device, ok := sh.devices[e.Key().(string)]
 	// fmt.Println("sync] ", device.IfaceName)
 	// fmt.Println(sh.devices)
@@ -106,7 +107,6 @@ func (sh *SyncHandler) Handle(e Event) {
 				return
 			}
 		}
-
 	}()
 }
 
@@ -134,13 +134,14 @@ func (rh *RecvHandler) Handle(e Event) {
 	}
 
 	device.states = param
+	reportParam := map[string]interface{}{"state": device.states, "sname": device.Sname, "did": device.Did}
 	channel, ok := rh.chanForSync[device.IfaceName]
 	if ok {
-		channel <- device.states
+		channel <- param
 	}
 
 	if rh.next != nil {
-		rh.next.Handle(e)
+		rh.next.Handle(&EventStruct{key: e.Key(), params: reportParam})
 	}
 
 	// fmt.Println("recv] ", device.states)

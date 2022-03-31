@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"etri-sfpoc-controller/config"
+	"etri-sfpoc-controller/devmanage/serialctrl"
 	"etri-sfpoc-controller/notifier"
 	"fmt"
 	"io/ioutil"
@@ -46,6 +47,15 @@ func RegisterDevice(dev map[string]interface{}, waitCh chan bool) {
 	}
 
 	json.Unmarshal(b, &dev)
+	fmt.Println(dev)
+	d1 := serialctrl.DevWithUUID[dev["dname"].(string)]
+	d1.Did = dev["did"].(string)
+
+	d2 := serialctrl.DevWithIface[d1.Iface]
+	d2.Did = dev["did"].(string)
+
+	fmt.Println("d1: ", d1)
+	fmt.Println("d2: ", d2)
 	log.Println("registered] ", dev)
 	waitCh <- true
 }

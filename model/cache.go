@@ -8,6 +8,16 @@ import (
 	"net/http"
 )
 
+var DB DBHandlerI
+
+func init() {
+	var err error
+	DB, err = NewSqliteHandler("dump.db")
+	if err != nil {
+		panic(err)
+	}
+}
+
 // func (s *_DBHandler) StatusCheck(did string, new map[string]interface{}) bool {
 // 	origin, ok := s.states[did]
 // 	if !ok {
@@ -40,7 +50,7 @@ func (s *_DBHandler) GetSID(sname string) (string, error) {
 	sid, ok := s.sidCache[sname]
 	if !ok {
 		req, err := http.NewRequest("GET",
-			fmt.Sprintf("http://%s/%s", config.Params["serverAddr"], "services"),
+			fmt.Sprintf("http://%s/%s", config.Params["serverAddr"], "api/v1/svcs"),
 			nil,
 		)
 
