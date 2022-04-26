@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"sync"
+	"time"
 )
 
 type DeviceControllerI interface {
@@ -14,26 +14,27 @@ type DeviceControllerI interface {
 	Sync(map[string]interface{}) error
 	Run()
 	close()
+	AddOnClose(func(dname string, ctrl DeviceControllerI))
 }
 
 type deviceController struct {
-	port        io.Reader
+	port        io.ReadWriter
 	dname       string
 	did         string
 	latestToken Token
-	wg          sync.WaitGroup
 	cmdCh       chan Event
-	ackCh       chan Token
+	ackCh       chan string
 	onRecv      func(e Event)
+	onClose     func(dname string, ctrl DeviceControllerI)
 }
 
-func NewDeviceController(port io.Reader, dname, did string) DeviceControllerI {
+func NewDeviceController(port io.ReadWriter, dname, did string) DeviceControllerI {
 	return &deviceController{
 		port:  port,
 		dname: dname,
 		did:   did,
 		cmdCh: make(chan Event),
-		ackCh: make(chan Token),
+		ackCh: make(chan string),
 	}
 }
 
@@ -45,6 +46,11 @@ func (ctrl *deviceController) close() {
 func (ctrl *deviceController) AddOnRecv(h func(e Event)) {
 	ctrl.onRecv = h
 }
+
+func (ctrl *deviceController) AddOnClose(h func(dname string, ctrl DeviceControllerI)) {
+	ctrl.onClose = h
+}
+
 func (ctrl *deviceController) Sync(body map[string]interface{}) error {
 	var err error
 	ctrl.latestToken, err = GetToken()
@@ -55,34 +61,55 @@ func (ctrl *deviceController) Sync(body map[string]interface{}) error {
 	ctrl.cmdCh <- NewEvent(map[string]interface{}{
 		"code":  1,
 		"body":  body,
-		"token": ctrl.latestToken,
+		"token": ctrl.latestToken.String(),
 	}, "command")
 
 	return nil
 }
 
 func (ctrl *deviceController) Run() {
-	ctrl.wg.Add(2)
 	go ctrl.recv()
 	go ctrl.send()
-	ctrl.wg.Wait()
 }
 
 func (ctrl *deviceController) send() {
-	// writer := json.NewEncoder(port)
-	defer ctrl.wg.Done()
+	enc := json.NewEncoder(ctrl.port)
+	timer := time.NewTimer(time.Second * 2)
+	defer timer.Stop()
+	var latestParams map[string]interface{}
 
-	for e := range ctrl.cmdCh {
-		// e.Params()
-		fmt.Println(e)
-		// writer.Encode(e.Params())
+	for {
+		select {
+		case e, ok := <-ctrl.cmdCh:
+			if !ok {
+				return
+			}
+			latestParams = e.Params()
+			err := enc.Encode(latestParams)
+			if err != nil {
+				log.Println(err)
+			}
+
+			timer.Reset(time.Second)
+		case tkn, ok := <-ctrl.ackCh:
+			if !ok {
+				return
+			}
+			if tkn == ctrl.latestToken.String() {
+				fmt.Println("Acked!!")
+				timer.Stop()
+			}
+		case <-timer.C:
+			err := enc.Encode(latestParams)
+			if err != nil {
+				log.Println(err)
+			}
+		}
 	}
 
-	fmt.Println("sender died")
 }
 
 func (ctrl *deviceController) recv() {
-	defer ctrl.wg.Done()
 	defer ctrl.close()
 
 	reader := bufio.NewReader(ctrl.port)
@@ -100,6 +127,10 @@ func (ctrl *deviceController) recv() {
 
 		if err == nil && ctrl.onRecv != nil {
 			ctrl.onRecv(NewEvent(recvObj, "recv"))
+		}
+
+		if recvObj["code"] == 200.0 {
+			ctrl.ackCh <- recvObj["token"].(string)
 		}
 	}
 }

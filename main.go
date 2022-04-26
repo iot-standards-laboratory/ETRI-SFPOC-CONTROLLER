@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/devmanager"
-	"etri-sfpoc-controller/logger"
+	"etri-sfpoc-controller/model"
 	"etri-sfpoc-controller/notifier"
 	"etri-sfpoc-controller/router"
 	"flag"
@@ -17,6 +19,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -123,13 +126,47 @@ func register() (string, error) {
 }
 
 func deviceManagerSetup() {
-	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) {
+	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) error {
 		// do register procedure
-		fmt.Println(sname)
-		port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}`))
+		port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
+
+		time.Sleep(time.Second * 1)
+
+		reader := bufio.NewReader(port)
+
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			return err
+		}
+		rcvMsg := map[string]interface{}{}
+		err = json.Unmarshal(line, &rcvMsg)
+		for err != nil && err.Error() == "unexpected end of JSON input" {
+			line, _, err = reader.ReadLine()
+			if err != nil {
+				return err
+			}
+			err = json.Unmarshal(line, &rcvMsg)
+		}
+		if err == nil {
+			if rcvMsg["code"] == 1.0 {
+				// register success
+				ctrl := devmanager.NewDeviceController(port, dname, "temporary")
+				model.AddDeviceController(dname, ctrl)
+
+				ctrl.AddOnRecv(func(e devmanager.Event) {
+					// call when msg recv
+					fmt.Println(e)
+				})
+				ctrl.Run()
+				return nil
+			} else {
+				return errors.New("code is not 1.0 error")
+			}
+		}
+
+		return err
 	})
 
-	
 	go devmanager.Watch()
 	// serialctrl.AddRecvListener(serialctrl.NewEventHandler(func(e serialctrl.Event) {
 	// 	param := e.Params()
@@ -174,21 +211,26 @@ func deviceManagerSetup() {
 	// 	<-respCh
 	// })
 
-	// serialctrl.AddRemoveHandleFunc(func(e serialctrl.Event) {
-	// 	param := e.Params()
-	// 	fmt.Println(param["uuid"].(string), " is removed!!")
-	// })
 }
 
 func main() {
 
-	logger.Start()
+	cfg := flag.Bool("init", false, "create initial config file")
+	flag.Parse()
 
-	exitCh := make(chan interface{})
-	go func() {
-		time.Sleep(10 * time.Hour)
-		exitCh <- true
-	}()
+	if *cfg {
+		config.CreateInitFile()
+		return
+	}
+
+	if _, err := os.Stat("./config.properties"); errors.Is(err, os.ErrNotExist) {
+		// path/to/whatever does not exist
+		fmt.Println("config file doesn't exist")
+		fmt.Println("please add -init option to create config file")
+		return
+	}
+
+	config.LoadConfig()
 
 	cid := config.Params["cid"].(string)
 	if cid == "blank" {
@@ -197,9 +239,51 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		config.Set("cid", cid)
 	}
 
-	// go subscribe(cid)
+	go subscribe(cid)
 	deviceManagerSetup()
+
 	router.NewRouter().Run(config.Params["bind"].(string))
+}
+
+func devManagerTest() {
+	var line string
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		line, _ = reader.ReadString('\n')
+		tkns := strings.Split(line, " ")
+		if tkns[0] == "exit" {
+			return
+		}
+
+		if tkns[0] == "fan" {
+			ctrl, err := model.GetDeviceController("DEVICE-A-UUID")
+			if err != nil {
+				panic(err)
+			}
+
+			parameter := false
+			if tkns[1] == "on\n" {
+				parameter = true
+			}
+
+			ctrl.Sync(map[string]interface{}{
+				"fan_out_status": parameter,
+			})
+		} else if tkns[0] == "lamp" {
+			ctrl, err := model.GetDeviceController("DEVICE-A-UUID")
+			if err != nil {
+				panic(err)
+			}
+
+			parameter := tkns[1][:2] == "on"
+			fmt.Println("parameter: ", parameter)
+			ctrl.Sync(map[string]interface{}{
+				"lamp_out_status": parameter,
+			})
+		}
+	}
 }

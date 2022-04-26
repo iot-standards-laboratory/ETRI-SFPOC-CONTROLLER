@@ -11,13 +11,7 @@ const Mode = "debug"
 
 var Params = map[string]interface{}{}
 
-func init() {
-
-	if _, err := os.Stat("./config.properties"); errors.Is(err, os.ErrNotExist) {
-		// path/to/whatever does not exist
-		createInitFile()
-	}
-
+func LoadConfig() {
 	p := properties.MustLoadFile("./config.properties", properties.UTF8)
 	Params["serverAddr"] = p.GetString("serverAddr", "localhost:3000")
 	Params["bind"] = p.GetString("bind", ":4000")
@@ -25,7 +19,7 @@ func init() {
 	Params["cid"] = p.GetString("cid", "blank")
 }
 
-func createInitFile() {
+func CreateInitFile() {
 	f, err := os.Create("./config.properties")
 	if err != nil {
 		panic(err)
@@ -36,6 +30,7 @@ func createInitFile() {
 	p.SetValue("serverAddr", "localhost:3000")
 	p.SetValue("bind", ":4000")
 	p.SetValue("cname", "controllerA")
+	p.SetValue("cid", "blank")
 	p.Write(f, properties.UTF8)
 
 }

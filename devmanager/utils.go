@@ -28,7 +28,7 @@ func (t Token) Hash() uint64 {
 
 // GetToken generates a random token by a given length
 func GetToken() (Token, error) {
-	b := make([]byte, 8)
+	b := make([]byte, 4)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.
 	if err != nil {

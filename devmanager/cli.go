@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"time"
 
 	"github.com/jacobsa/go-serial/serial"
 )
@@ -13,11 +15,11 @@ import (
 var ctx context.Context
 var cancel context.CancelFunc
 
-var onDiscovered func(port io.ReadWriter, sname, dname string) = nil
+var onDiscovered func(port io.ReadWriter, sname, dname string) error = nil
 
 var onConnected func(e Event) = nil
 
-func AddOnDiscovered(h func(port io.ReadWriter, sname, dname string)) {
+func AddOnDiscovered(h func(port io.ReadWriter, sname, dname string) error) {
 	onDiscovered = h
 }
 
@@ -50,15 +52,16 @@ func Watch() error {
 		iface, err = WatchNewDevice(ctx)
 		if err == nil {
 			// onDiscover
-			fmt.Println("discivered!! - ", iface)
+			go discover(iface)
 		} else if err.Error() != "not found device" {
 			return err
 		}
 	}
 }
 
-func discover(iface string) error {
-	var err error
+func discover(iface string) {
+
+	defer log.Println("exit discover()")
 	// err = changePermission(iface)
 	// if err != nil {
 	// 	return err
@@ -74,7 +77,7 @@ func discover(iface string) error {
 
 	port, err := serial.Open(options)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	reader := bufio.NewReader(port)
@@ -84,28 +87,34 @@ func discover(iface string) error {
 	sndMsg["code"] = 0
 	sndMsg["token"], err = GetToken()
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil {
-			return err
+			panic(err)
 		}
 		rcvMsg := map[string]interface{}{}
 		err = json.Unmarshal(line, &rcvMsg)
 		if err == nil {
-			if rcvMsg["code"] != 1.0 {
-				fmt.Println("initial done")
-				return nil
+			if rcvMsg["code"] == 1.0 {
+				port.Write([]byte(`{"code": 255, "token": "initial", "mode": 0}`))
+				time.Sleep(time.Second * 2)
+				continue
 			}
 
 			if onDiscovered != nil {
-				onDiscovered(port, rcvMsg["sname"].(string), rcvMsg["uuid"].(string))
+				err = onDiscovered(port, rcvMsg["sname"].(string), rcvMsg["uuid"].(string))
+
+				if err == nil {
+					return
+				} else {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
-
 	// return nil
 }
 
