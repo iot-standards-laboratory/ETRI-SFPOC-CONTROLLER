@@ -1,8 +1,6 @@
 package router
 
 import (
-	"errors"
-	"etri-sfpoc-controller/devmanage"
 	"etri-sfpoc-controller/notifier"
 	"net/http"
 
@@ -20,26 +18,26 @@ func PutDevice(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func PostDevice(c *gin.Context) {
-	defer handleError(c)
+// func PostDevice(c *gin.Context) {
+// 	defer handleError(c)
 
-	w := c.Writer
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+// 	w := c.Writer
+// 	w.Header().Set("Access-Control-Allow-Origin", "*")
+// 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 
-	param := map[string]interface{}{}
-	c.BindJSON(&param)
+// 	param := map[string]interface{}{}
+// 	c.BindJSON(&param)
 
-	respCh := make(chan bool)
-	go devmanage.RegisterDevice(param, respCh)
+// 	respCh := make(chan bool)
+// 	go devmanage.RegisterDevice(param, respCh)
 
-	select {
-	case b := <-respCh:
-		if !b {
-			panic(errors.New("something went wrong"))
-		}
-		c.String(http.StatusCreated, "OK")
-	case <-c.Request.Context().Done():
-		panic(errors.New("request is canceled"))
-	}
-}
+// 	select {
+// 	case b := <-respCh:
+// 		if !b {
+// 			panic(errors.New("something went wrong"))
+// 		}
+// 		c.String(http.StatusCreated, "OK")
+// 	case <-c.Request.Context().Done():
+// 		panic(errors.New("request is canceled"))
+// 	}
+// }

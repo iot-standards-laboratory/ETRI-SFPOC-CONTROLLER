@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"encoding/json"
 	"etri-sfpoc-controller/config"
-	"etri-sfpoc-controller/devmanage"
-	"etri-sfpoc-controller/devmanage/serialctrl"
-	"etri-sfpoc-controller/model"
+	"etri-sfpoc-controller/devmanager"
+	"etri-sfpoc-controller/logger"
 	"etri-sfpoc-controller/notifier"
 	"etri-sfpoc-controller/router"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -46,13 +47,15 @@ func subscribe(token string) {
 				log.Println("read:", err)
 				return
 			}
-			log.Printf("recv: %s", message)
+
 			obj := map[string]interface{}{}
 			err = json.Unmarshal(message, &obj)
 			if err != nil {
 				log.Println("read:", err)
 				return
 			}
+
+			// log.Printf("recv: %s", obj["value"].(map[string]interface{})["dname"].(string))
 
 			notifier.Box.Publish(
 				notifier.NewEvent(
@@ -120,56 +123,73 @@ func register() (string, error) {
 }
 
 func deviceManagerSetup() {
-	serialctrl.AddRecvListener(serialctrl.NewEventHandler(func(e serialctrl.Event) {
-		param := e.Params()
-		fmt.Println("RECV: ", e.Params())
-		sid, err := model.DB.GetSID(param["sname"].(string))
-		if err != nil {
-			log.Println(err)
-		}
-
-		if sid == "not installed service" || sid == "not exist service" {
-			return
-		}
-
-		b, _ := json.Marshal(param)
-		req, err := http.NewRequest("PUT", "http://"+config.Params["serverAddr"].(string)+"/svc/"+sid+"/api/v1", bytes.NewReader(b))
-		if err != nil {
-			panic(err)
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			panic(err)
-		}
-
-		dec := json.NewDecoder(resp.Body)
-		var respObj map[string]interface{}
-		err = dec.Decode(&respObj)
-		if err != nil {
-			log.Println(err)
-		}
-		fmt.Println(respObj)
-
-		// serialctrl.Sync("DEVICE-A-UUID", map[string]interface{}{"ctrlValue": 100})
-	}))
-
-	serialctrl.AddRegisterHandleFunc(func(e serialctrl.Event) {
-		param := e.Params()
-		payload := map[string]interface{}{"sname": param["sname"], "dname": param["uuid"], "type": "sensor"}
-		fmt.Println("payload : ", payload)
-		respCh := make(chan bool)
-		go devmanage.RegisterDevice(payload, respCh)
-		<-respCh
+	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) {
+		// do register procedure
+		fmt.Println(sname)
+		port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}`))
 	})
 
-	serialctrl.AddRemoveHandleFunc(func(e serialctrl.Event) {
-		param := e.Params()
-		fmt.Println(param["uuid"].(string), " is removed!!")
-	})
+	
+	go devmanager.Watch()
+	// serialctrl.AddRecvListener(serialctrl.NewEventHandler(func(e serialctrl.Event) {
+	// 	param := e.Params()
+	// 	fmt.Println("RECV: ", e.Params())
+	// 	sid, err := model.DB.GetSID(param["sname"].(string))
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	}
+
+	// 	if sid == "not installed service" || sid == "not exist service" {
+	// 		return
+	// 	}
+
+	// 	b, _ := json.Marshal(param)
+	// 	req, err := http.NewRequest("PUT", "http://"+config.Params["serverAddr"].(string)+"/svc/"+sid+"/api/v1", bytes.NewReader(b))
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+
+	// 	resp, err := http.DefaultClient.Do(req)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+
+	// 	dec := json.NewDecoder(resp.Body)
+	// 	var respObj map[string]interface{}
+	// 	err = dec.Decode(&respObj)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 	}
+	// 	fmt.Println(respObj)
+
+	// 	// serialctrl.Sync("DEVICE-A-UUID", map[string]interface{}{"ctrlValue": 100})
+	// }))
+
+	// serialctrl.AddRegisterHandleFunc(func(e serialctrl.Event) {
+	// 	param := e.Params()
+	// 	payload := map[string]interface{}{"sname": param["sname"], "dname": param["uuid"], "type": "sensor"}
+	// 	fmt.Println("payload : ", payload)
+	// 	respCh := make(chan bool)
+	// 	go devmanage.RegisterDevice(payload, respCh)
+	// 	<-respCh
+	// })
+
+	// serialctrl.AddRemoveHandleFunc(func(e serialctrl.Event) {
+	// 	param := e.Params()
+	// 	fmt.Println(param["uuid"].(string), " is removed!!")
+	// })
 }
 
 func main() {
+
+	logger.Start()
+
+	exitCh := make(chan interface{})
+	go func() {
+		time.Sleep(10 * time.Hour)
+		exitCh <- true
+	}()
+
 	cid := config.Params["cid"].(string)
 	if cid == "blank" {
 		var err error
@@ -179,13 +199,7 @@ func main() {
 		}
 	}
 
-	run, cancel := devmanage.NewManager()
-	go run()
-	go router.NewRouter().Run(config.Params["bind"].(string))
+	// go subscribe(cid)
 	deviceManagerSetup()
-	go serialctrl.Run()
-	subscribe(cid)
-
-	defer serialctrl.Close()
-	cancel()
+	router.NewRouter().Run(config.Params["bind"].(string))
 }

@@ -4,6 +4,7 @@ import "etrisfpocdatamodel"
 
 type Device etrisfpocdatamodel.Device
 
+
 func (s *_DBHandler) GetDevices() ([]*Device, int, error) {
 	var devices []*Device
 
@@ -14,10 +15,6 @@ func (s *_DBHandler) GetDevices() ([]*Device, int, error) {
 	}
 	return devices, int(result.RowsAffected), nil
 }
-
-// func (s *dbHandler) GetDevice() *Device {
-// 	device := &Device{}
-// }
 
 func (s *_DBHandler) AddDevice(device *Device) error {
 
