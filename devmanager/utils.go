@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"hash/crc64"
 	"io/ioutil"
 	"log"
 	"os/exec"
@@ -21,9 +22,9 @@ func (t Token) String() string {
 	return hex.EncodeToString(t)
 }
 
-// func (t Token) Hash() uint64 {
-// 	return crc64.Checksum(t, crc64.MakeTable(crc64.ISO))
-// }
+func (t Token) Hash() uint64 {
+	return crc64.Checksum(t, crc64.MakeTable(crc64.ISO))
+}
 
 // GetToken generates a random token by a given length
 func GetToken() (Token, error) {

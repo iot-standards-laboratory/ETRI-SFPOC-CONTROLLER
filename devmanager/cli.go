@@ -14,29 +14,23 @@ var ctx context.Context
 var cancel context.CancelFunc
 
 var onDiscovered func(port io.ReadWriter, sname, dname string) = nil
-var onRecv func(e Event) = nil
 
 var onConnected func(e Event) = nil
-var onDisconnected func(e Event) = nil
 
 func AddOnDiscovered(h func(port io.ReadWriter, sname, dname string)) {
 	onDiscovered = h
-}
-
-func AddRecvHandleFunc(h func(e Event)) {
-	onRecv = h
 }
 
 func AddOnConnected(h func(e Event)) {
 	onConnected = h
 }
 
-func AddOnDisconnected(h func(e Event)) {
-	onDisconnected = h
-}
-
 func init() {
 	ctx, cancel = context.WithCancel(context.Background())
+}
+
+func Close() {
+	cancel()
 }
 
 func Watch() error {
@@ -60,30 +54,6 @@ func Watch() error {
 		} else if err.Error() != "not found device" {
 			return err
 		}
-
-		// if discoverHandleFunc != nil {
-		// 	discoverHandleFunc(NewEvent(map[string]interface{}{"iface": iface}, "discovered"))
-		// }
-
-		// fmt.Println("initDevice")
-
-		// err = initDevice()
-		// if err != nil {
-		// 	log.Println(err)
-		// 	port.Close()
-		// 	continue
-		// }
-
-		// fmt.Println("recv")
-		// err := recv(port, recvHandleFunc)
-		// if err.Error() == "EOF" {
-		// 	if onDisconnected != nil {
-		// 		onDisconnected(NewEvent(map[string]interface{}{"iface": iface}, "disconnected"))
-		// 	}
-		// 	iface = ""
-		// } else {
-		// 	panic(err)
-		// }
 	}
 }
 
