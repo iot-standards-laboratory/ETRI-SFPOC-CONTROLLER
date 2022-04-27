@@ -74,10 +74,10 @@ func WatchNewDevice(ctx context.Context) (string, error) {
 	}
 }
 
-func ChangePermission(iface string) error {
+func changePermission(iface string) error {
 	log.Println("changing the mod of file")
 
-	cmd := exec.Command("chmod", "a+rw", iface)
+	cmd := exec.Command("sudo", "chmod", "a+rw", iface)
 	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return err

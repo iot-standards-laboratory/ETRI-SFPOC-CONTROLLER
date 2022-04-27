@@ -83,8 +83,8 @@ func subscribe(token string) {
 			err := c.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
 			if err != nil {
 				log.Println("write close:", err)
-				return
 			}
+			os.Exit(0)
 		}
 	}
 }
@@ -127,44 +127,72 @@ func register() (string, error) {
 
 func deviceManagerSetup() {
 	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) error {
+		defer fmt.Println("exit onDiscovered()")
 		// do register procedure
-		port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
 
-		time.Sleep(time.Second * 1)
-
-		reader := bufio.NewReader(port)
-
-		line, _, err := reader.ReadLine()
+		// send request to server for registration of device
+		err := devmanager.RegisterDevice(nil, nil)
 		if err != nil {
+			log.Println(err.Error())
 			return err
 		}
-		rcvMsg := map[string]interface{}{}
-		err = json.Unmarshal(line, &rcvMsg)
-		for err != nil && err.Error() == "unexpected end of JSON input" {
-			line, _, err = reader.ReadLine()
+		fmt.Println("waiting server's response")
+
+		okchan := make(chan error)
+		defer close(okchan)
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			// send message to device for modifying mode
+			_, err = port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
 			if err != nil {
 				return err
 			}
-			err = json.Unmarshal(line, &rcvMsg)
-		}
-		if err == nil {
-			if rcvMsg["code"] == 1.0 {
-				// register success
-				ctrl := devmanager.NewDeviceController(port, dname, "temporary")
-				model.AddDeviceController(dname, ctrl)
+			// check modification of mode change for 5seconds
+			go func() {
+				reader := bufio.NewReader(port)
+				rcvMsg := map[string]interface{}{}
+				for {
+					line, _, err := reader.ReadLine()
+					if err != nil {
+						log.Println(err)
+						okchan <- err
+						return
+					}
+					fmt.Println("line: ", string(line))
 
-				ctrl.AddOnRecv(func(e devmanager.Event) {
-					// call when msg recv
-					fmt.Println(e)
-				})
-				ctrl.Run()
-				return nil
-			} else {
-				return errors.New("code is not 1.0 error")
+					err = json.Unmarshal(line, &rcvMsg)
+					if err != nil {
+						continue
+					}
+
+					fmt.Println("code: ", rcvMsg["code"])
+					if rcvMsg["code"].(float64)-1.0 < 0.0001 {
+						// register success
+						ctrl := devmanager.NewDeviceController(port, dname, "temporary")
+						model.AddDeviceController(dname, ctrl)
+						ctrl.AddOnRecv(func(e devmanager.Event) {
+							// call when msg recv
+							fmt.Println(e)
+						})
+						ctrl.Run()
+						okchan <- nil
+						return
+					}
+				}
+			}()
+
+			select {
+			case <-ticker.C:
+				fmt.Println("timeout")
+			case err := <-okchan:
+				if err != nil {
+					log.Println(err)
+				}
+				return err
 			}
 		}
-
-		return err
 	})
 
 	go devmanager.Watch()
@@ -243,9 +271,9 @@ func main() {
 		config.Set("cid", cid)
 	}
 
-	go subscribe(cid)
+	// go subscribe(cid)
 	deviceManagerSetup()
-
+	go devManagerTest()
 	router.NewRouter().Run(config.Params["bind"].(string))
 }
 

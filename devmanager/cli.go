@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"time"
@@ -59,13 +58,14 @@ func Watch() error {
 	}
 }
 
-func discover(iface string) {
+func discover(iface string) error {
 
 	defer log.Println("exit discover()")
-	// err = changePermission(iface)
-	// if err != nil {
-	// 	return err
-	// }
+	err := changePermission(iface)
+	if err != nil {
+		log.Println(err)
+		return err
+	}
 
 	options := serial.OpenOptions{
 		PortName:        iface,
@@ -77,7 +77,8 @@ func discover(iface string) {
 
 	port, err := serial.Open(options)
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return err
 	}
 
 	reader := bufio.NewReader(port)
@@ -87,32 +88,30 @@ func discover(iface string) {
 	sndMsg["code"] = 0
 	sndMsg["token"], err = GetToken()
 	if err != nil {
-		panic(err)
+		log.Println(err)
+		return err
 	}
 
 	for {
 		line, _, err := reader.ReadLine()
 		if err != nil {
-			panic(err)
+			log.Println(err)
+			return err
 		}
 		rcvMsg := map[string]interface{}{}
 		err = json.Unmarshal(line, &rcvMsg)
 		if err == nil {
 			if rcvMsg["code"] == 1.0 {
 				port.Write([]byte(`{"code": 255, "token": "initial", "mode": 0}`))
-				time.Sleep(time.Second * 2)
+				time.Sleep(time.Second)
 				continue
 			}
 
 			if onDiscovered != nil {
-				err = onDiscovered(port, rcvMsg["sname"].(string), rcvMsg["uuid"].(string))
-
-				if err == nil {
-					return
-				} else {
-					fmt.Println(err)
-				}
+				return onDiscovered(port, rcvMsg["sname"].(string), rcvMsg["uuid"].(string))
 			}
+
+			return nil
 		}
 	}
 	// return nil
