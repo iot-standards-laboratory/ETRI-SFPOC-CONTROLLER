@@ -3,48 +3,48 @@ package model
 import (
 	"errors"
 	"etri-sfpoc-controller/config"
+	"etri-sfpoc-controller/devmanager"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"sync"
 )
 
-var DB DBHandlerI
+var DefaultDB DBHandlerI
 
 func init() {
 	var err error
-	DB, err = NewSqliteHandler("dump.db")
+	DefaultDB, err = NewSqliteHandler("dump.db")
 	if err != nil {
 		panic(err)
 	}
 }
 
-// func (s *_DBHandler) StatusCheck(did string, new map[string]interface{}) bool {
-// 	origin, ok := s.states[did]
-// 	if !ok {
-// 		fmt.Println(did)
-// 		fmt.Println("insert origin, before", s.states[did])
-// 		s.states[did] = new
-// 		// origin = map[string]interface{}{}
-// 		// s.states[did] = origin
-// 		// for k, v := range new {
-// 		// 	origin[k] = v
-// 		// }
-// 		fmt.Println("insert origin, after", s.states[did])
-// 		fmt.Println("insert origin, new", new)
-// 		return true
-// 	}
+var devCtrls = map[string]devmanager.DeviceControllerI{}
+var mutex sync.Mutex
 
-// 	changed := false
-// 	for k, v := range new {
-// 		if v.(float64) != origin[k].(float64) {
-// 			fmt.Println("origin, new", v, origin[k])
-// 			origin[k] = v
-// 			changed = true
-// 		}
-// 	}
+func AddDeviceController(dname string, ctrl devmanager.DeviceControllerI) {
 
-// 	return changed
-// }
+	mutex.Lock()
+	defer mutex.Unlock()
+	devCtrls[dname] = ctrl
+
+}
+
+func GetDeviceController(dname string) (devmanager.DeviceControllerI, error) {
+	ctrl, ok := devCtrls[dname]
+	if !ok {
+		return nil, errors.New("does not exist error")
+	}
+
+	return ctrl, nil
+}
+
+func RemoveDeviceController(dname string) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	delete(devCtrls, dname)
+}
 
 func (s *_DBHandler) GetSID(sname string) (string, error) {
 	sid, ok := s.sidCache[sname]

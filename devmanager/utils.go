@@ -68,7 +68,6 @@ func WatchNewDevice(ctx context.Context) (string, error) {
 		case e := <-filter:
 			if strings.Contains(e.Path(), "/dev/ttyACM") || strings.Contains(e.Path(), "/dev/ttyUSB") {
 				return e.Path(), nil
-
 			}
 		}
 	}

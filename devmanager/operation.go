@@ -11,6 +11,7 @@ import (
 )
 
 func RegisterDevice(dev map[string]interface{}) (string, error) {
+
 	dev["cid"] = config.Params["cid"]
 	b, err := json.Marshal(dev)
 	if err != nil {

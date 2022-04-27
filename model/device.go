@@ -4,7 +4,6 @@ import "etrisfpocdatamodel"
 
 type Device etrisfpocdatamodel.Device
 
-
 func (s *_DBHandler) GetDevices() ([]*Device, int, error) {
 	var devices []*Device
 
@@ -28,15 +27,23 @@ func (s *_DBHandler) AddDevice(device *Device) error {
 
 }
 
-func (s *_DBHandler) GetDeviceID(dname string) (*Device, error) {
+func (s *_DBHandler) IsExistDevice(dname string) bool {
+	var device = Device{}
+
+	result := s.db.First(&device, "dname=?", dname)
+
+	return result.Error != nil
+}
+
+func (s *_DBHandler) GetDeviceID(dname string) (string, error) {
 	var device Device
 	tx := s.db.Select("did", "sname").First(&device, "dname=?", dname)
 
 	if tx.Error != nil {
-		return nil, tx.Error
+		return "", tx.Error
 	}
 
-	return &device, nil
+	return device.DID, nil
 }
 
 func (s *_DBHandler) GetServiceForDevice(did string) (string, error) {

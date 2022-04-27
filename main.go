@@ -129,77 +129,144 @@ func deviceManagerSetup() {
 	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) error {
 		defer log.Println("exit onDiscovered()")
 		// do register procedure
+		//check already registered device
+
+		var did string
+		var err error
+		did, err = model.DefaultDB.GetDeviceID(dname)
+		if err != nil {
+			did, err = devmanager.RegisterDevice(map[string]interface{}{
+				"sname": sname,
+				"dname": dname,
+			})
+			if err != nil {
+				log.Println(err.Error())
+				return err
+			}
+
+			cid := config.Params["cid"].(string)
+			model.DefaultDB.AddDevice(&model.Device{
+				DID:   did,
+				DName: dname,
+				SName: sname,
+				CID:   cid,
+			})
+		} else {
+			log.Println("device is already registered")
+		}
 
 		// send request to server for registration of device
-		did, err := devmanager.RegisterDevice(map[string]interface{}{
-			"sname": sname,
-			"dname": dname,
-		})
-
-		if err != nil {
-			log.Println(err.Error())
-			return err
-		}
-		fmt.Println("waiting server's response")
 
 		okchan := make(chan error)
 		defer close(okchan)
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(10 * time.Second)
 		defer ticker.Stop()
 
-		for {
-			// send message to device for modifying mode
-			_, err = port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
-			if err != nil {
-				return err
-			}
-			// check modification of mode change for 5seconds
-			go func() {
-				reader := bufio.NewReader(port)
-				rcvMsg := map[string]interface{}{}
-				for {
-					line, _, err := reader.ReadLine()
-					if err != nil {
-						log.Println(err)
-						okchan <- err
-						return
-					}
-					fmt.Println("line: ", string(line))
+		_, err = port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
+		if err != nil {
+			return err
+		}
 
-					err = json.Unmarshal(line, &rcvMsg)
-					if err != nil {
-						continue
-					}
+		go func() {
+			reader := bufio.NewReader(port)
+			rcvMsg := map[string]interface{}{}
 
-					fmt.Println("code: ", rcvMsg["code"])
-					if rcvMsg["code"].(float64)-1.0 < 0.0001 {
-						// register success
-						ctrl := devmanager.NewDeviceController(port, dname, did)
-						model.AddDeviceController(dname, ctrl)
-						ctrl.AddOnRecv(func(e devmanager.Event) {
-							// call when msg recv
-							fmt.Println(e)
-						})
-						ctrl.Run()
-						okchan <- nil
-						return
-					}
+			for {
+				line, _, err := reader.ReadLine()
+				if err != nil {
+					log.Println("okchan : ", err)
+					okchan <- err
+					return
 				}
-			}()
+				fmt.Println("line: ", string(line))
 
+				err = json.Unmarshal(line, &rcvMsg)
+				if err != nil {
+					continue
+				}
+
+				fmt.Println("code: ", rcvMsg["code"])
+				if rcvMsg["code"].(float64)-1.0 < 0.0001 {
+					// register success
+					ctrl := makeDeviceController(port, did, dname)
+					model.AddDeviceController(dname, ctrl)
+					ctrl.Run()
+					okchan <- nil
+					return
+				}
+			}
+		}()
+
+		for {
 			select {
 			case <-ticker.C:
-				fmt.Println("timeout")
-			case err := <-okchan:
+				fmt.Println("retransmission command to change mode as timeout")
+				_, err = port.Write([]byte(`{"code": 1, "token": "initial", "mode": 1}\n`))
 				if err != nil {
+					return err
+				}
+			case err := <-okchan:
+				if err == nil {
+					return nil
+				} else {
 					log.Println(err)
 				}
-				return err
 			}
 		}
 	})
 
 	go devmanager.Watch()
+}
+
+func makeDeviceController(port io.ReadWriter, did, dname string) devmanager.DeviceControllerI {
+
+	// model.AddDeviceController 에서 등록된 디바이스 목록에 해당 디바이스 추가할 것!!
+	ctrl := devmanager.NewDeviceController(port, dname, did)
+
+	ctrl.AddOnRecv(func(e devmanager.Event) {
+		// call when msg recv
+		fmt.Println(e)
+	})
+
+	ctrl.AddOnClose(func(dname string, did string, ctrl devmanager.DeviceControllerI) error {
+		// call when msg recv
+
+		// send request to server for deletion of device
+		// bodyB, err := json.Marshal(map[string]interface{}{
+		// 	"dname": dname,
+		// 	"did":   did,
+		// })
+		// if err != nil {
+		// 	return err
+		// }
+
+		// req, err := http.NewRequest(
+		// 	"DELETE",
+		// 	fmt.Sprintf("http://%s/api/v1/devs", config.Params["serverAddr"].(string)),
+		// 	bytes.NewReader(bodyB),
+		// )
+		// if err != nil {
+		// 	return err
+		// }
+
+		// resp, err := http.DefaultClient.Do(req)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// b, err := ioutil.ReadAll(resp.Body)
+		// if err != nil {
+		// 	return err
+		// }
+
+		// log.Println(string(b))
+
+		// delete controller from cache
+		model.RemoveDeviceController(dname)
+		return nil
+	})
+
+	return ctrl
 }
 
 func main() {

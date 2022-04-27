@@ -14,7 +14,7 @@ type DeviceControllerI interface {
 	Sync(map[string]interface{}) error
 	Run()
 	close()
-	AddOnClose(func(dname string, ctrl DeviceControllerI))
+	AddOnClose(func(dname string, did string, ctrl DeviceControllerI) error)
 }
 
 type deviceController struct {
@@ -25,7 +25,7 @@ type deviceController struct {
 	cmdCh       chan Event
 	ackCh       chan string
 	onRecv      func(e Event)
-	onClose     func(dname string, ctrl DeviceControllerI)
+	onClose     func(dname string, did string, ctrl DeviceControllerI) error
 }
 
 func NewDeviceController(port io.ReadWriter, dname, did string) DeviceControllerI {
@@ -41,13 +41,16 @@ func NewDeviceController(port io.ReadWriter, dname, did string) DeviceController
 func (ctrl *deviceController) close() {
 	close(ctrl.cmdCh)
 	close(ctrl.ackCh)
+	if ctrl.onClose != nil {
+		ctrl.onClose(ctrl.dname, ctrl.did, ctrl)
+	}
 }
 
 func (ctrl *deviceController) AddOnRecv(h func(e Event)) {
 	ctrl.onRecv = h
 }
 
-func (ctrl *deviceController) AddOnClose(h func(dname string, ctrl DeviceControllerI)) {
+func (ctrl *deviceController) AddOnClose(h func(dname string, did string, ctrl DeviceControllerI) error) {
 	ctrl.onClose = h
 }
 
