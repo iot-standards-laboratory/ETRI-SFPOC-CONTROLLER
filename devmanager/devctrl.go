@@ -77,8 +77,12 @@ func (ctrl *deviceController) Run() {
 
 func (ctrl *deviceController) send() {
 	enc := json.NewEncoder(ctrl.port)
-	timer := time.NewTimer(time.Second * 2)
-	defer timer.Stop()
+	// enc := json.NewEncoder(os.Stdout)
+	ticker := time.NewTicker(time.Second)
+	ticker.Stop()
+	defer func() {
+		ticker.Stop()
+	}()
 	var latestParams map[string]interface{}
 
 	for {
@@ -93,16 +97,17 @@ func (ctrl *deviceController) send() {
 				log.Println(err)
 			}
 
-			timer.Reset(time.Second)
+			ticker.Reset(time.Second * 5)
 		case tkn, ok := <-ctrl.ackCh:
 			if !ok {
 				return
 			}
 			if tkn == ctrl.latestToken.String() {
 				fmt.Println("Acked!!")
-				timer.Stop()
+				ticker.Stop()
 			}
-		case <-timer.C:
+		case <-ticker.C:
+			fmt.Println("retransmission as timeout : ", latestParams)
 			err := enc.Encode(latestParams)
 			if err != nil {
 				log.Println(err)
@@ -132,7 +137,7 @@ func (ctrl *deviceController) recv() {
 			ctrl.onRecv(NewEvent(recvObj, "recv"))
 		}
 
-		if recvObj["code"] == 200.0 {
+		if recvObj["code"] == 2.0 {
 			ctrl.ackCh <- recvObj["token"].(string)
 		}
 	}

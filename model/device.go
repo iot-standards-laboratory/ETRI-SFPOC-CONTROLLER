@@ -1,6 +1,9 @@
 package model
 
-import "etrisfpocdatamodel"
+import (
+	"etrisfpocdatamodel"
+	"fmt"
+)
 
 type Device etrisfpocdatamodel.Device
 
@@ -17,6 +20,7 @@ func (s *_DBHandler) GetDevices() ([]*Device, int, error) {
 
 func (s *_DBHandler) AddDevice(device *Device) error {
 
+	fmt.Println("device name : ", device.DName)
 	tx := s.db.Create(device)
 	if tx.Error != nil {
 		return tx.Error
@@ -27,12 +31,15 @@ func (s *_DBHandler) AddDevice(device *Device) error {
 
 }
 
-func (s *_DBHandler) IsExistDevice(dname string) bool {
-	var device = Device{}
+func (s *_DBHandler) GetDevice(did string) (*Device, error) {
+	var device Device
+	tx := s.db.First(&device, "did=?", did)
 
-	result := s.db.First(&device, "dname=?", dname)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
 
-	return result.Error != nil
+	return &device, nil
 }
 
 func (s *_DBHandler) GetDeviceID(dname string) (string, error) {

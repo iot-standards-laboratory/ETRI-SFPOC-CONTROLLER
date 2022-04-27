@@ -58,7 +58,7 @@ func subscribe(token string, handler func(parmas []byte)) {
 				return
 			}
 
-			// log.Printf("recv: %s", obj["value"].(map[string]interface{})["dname"].(string))
+			log.Printf("recv: %s", obj["value"].(map[string]interface{})["did"].(string))
 			if handler != nil {
 				handler(message)
 			}
@@ -294,10 +294,63 @@ func main() {
 	}
 
 	go subscribe(cid, func(payload []byte) {
-		fmt.Println(cid, " : ", string(payload))
+		cmdJson := map[string]interface{}{}
+		err := json.Unmarshal(payload, &cmdJson)
+		if err != nil {
+			return
+		}
+
+		key, ok := cmdJson["key"].(string)
+		if !ok {
+			return
+		}
+
+		if key == "control" {
+			value, ok := cmdJson["value"].(map[string]interface{})
+			if !ok {
+				return
+			}
+			did, ok := value["did"].(string)
+			if !ok {
+				return
+			}
+
+			dev, err := model.DefaultDB.GetDevice(did)
+			if err != nil {
+				return
+			}
+
+			ctrl, err := model.GetDeviceController(dev.DName)
+			if err != nil {
+				panic(err)
+			}
+
+			status, ok := value["status"].(map[string]interface{})
+			fmt.Println(status)
+			if !ok {
+				return
+			}
+			ctrl.Sync(status)
+		}
+
 	})
 	go subscribe(notifier.SubtokenStatusChanged, func(payload []byte) {
-		fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
+		// fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
+		event := map[string]interface{}{}
+		err := json.Unmarshal(payload, &event)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		key, ok := event["key"].(string)
+		if !ok {
+			return
+		}
+
+		if key == "service is registered" {
+			fmt.Println("service is registered!!")
+		}
 	})
 	deviceManagerSetup()
 	go devManagerTest()
