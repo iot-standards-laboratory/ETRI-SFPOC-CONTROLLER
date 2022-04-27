@@ -25,13 +25,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func subscribe(token string) {
+func subscribe(token string, handler func(parmas []byte)) {
 	fmt.Println("token: ", token)
-	var addr = flag.String("addr", config.Params["serverAddr"].(string), "http service address")
+	var addr = config.Params["serverAddr"].(string)
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
-	u := url.URL{Scheme: "ws", Host: *addr, Path: "/push/v1/" + token}
+	u := url.URL{Scheme: "ws", Host: addr, Path: "/push/v1/" + token}
 	log.Printf("connecting to %s", u.String())
 
 	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
@@ -59,14 +59,9 @@ func subscribe(token string) {
 			}
 
 			// log.Printf("recv: %s", obj["value"].(map[string]interface{})["dname"].(string))
-
-			notifier.Box.Publish(
-				notifier.NewEvent(
-					"title",
-					obj,
-					notifier.SubtokenRcvCtrlMsg,
-				),
-			)
+			if handler != nil {
+				handler(message)
+			}
 		}
 	}()
 
@@ -156,7 +151,6 @@ func deviceManagerSetup() {
 		}
 
 		// send request to server for registration of device
-
 		okchan := make(chan error)
 		defer close(okchan)
 		ticker := time.NewTicker(10 * time.Second)
@@ -299,7 +293,12 @@ func main() {
 		config.Set("cid", cid)
 	}
 
-	// go subscribe(cid)
+	go subscribe(cid, func(payload []byte) {
+		fmt.Println(cid, " : ", string(payload))
+	})
+	go subscribe(notifier.SubtokenStatusChanged, func(payload []byte) {
+		fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
+	})
 	deviceManagerSetup()
 	go devManagerTest()
 	router.NewRouter().Run(config.Params["bind"].(string))
