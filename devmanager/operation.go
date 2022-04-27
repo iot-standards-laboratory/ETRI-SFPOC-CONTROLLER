@@ -1,45 +1,38 @@
 package devmanager
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"etri-sfpoc-controller/config"
 	"fmt"
-	"time"
+	"io/ioutil"
+	"net/http"
 )
 
-func RegisterDevice(dev map[string]interface{}, waitCh chan bool) error {
-	fmt.Println("register device()")
-	time.Sleep(time.Second * 2)
-	return nil
-	// dev["cid"] = config.Params["cid"]
-	// b, err := json.Marshal(dev)
-	// if err != nil {
-	// 	log.Println(err)
-	// 	waitCh <- false
-	// }
+func RegisterDevice(dev map[string]interface{}) (string, error) {
+	dev["cid"] = config.Params["cid"]
+	b, err := json.Marshal(dev)
+	if err != nil {
+		return "", err
+	}
 
-	// resp, err := http.Post(fmt.Sprintf("http://%s/api/v1/devs/discover", config.Params["serverAddr"].(string)), "application/json", bytes.NewReader(b))
-	// if err != nil || resp.StatusCode != http.StatusCreated {
-	// 	log.Println(err)
-	// 	waitCh <- false
-	// 	return
-	// }
+	fmt.Println(string(b))
 
-	// b, err = ioutil.ReadAll(resp.Body)
-	// if err != nil || resp.StatusCode != http.StatusCreated {
-	// 	log.Println(err)
-	// 	waitCh <- false
-	// 	return
-	// }
+	resp, err := http.Post(fmt.Sprintf("http://%s/api/v1/devs/discover", config.Params["serverAddr"].(string)), "application/json", bytes.NewReader(b))
+	if err != nil {
+		return "", err
+	} else if resp.StatusCode != http.StatusCreated {
+		return "", errors.New("it is failed to get permission from admin")
+	}
 
-	// json.Unmarshal(b, &dev)
-	// fmt.Println(dev)
-	// d1 := serialctrl.DevWithUUID[dev["dname"].(string)]
-	// d1.Did = dev["did"].(string)
+	b, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
 
-	// d2 := serialctrl.DevWithIface[d1.Iface]
-	// d2.Did = dev["did"].(string)
+	json.Unmarshal(b, &dev)
+	fmt.Println(dev)
 
-	// fmt.Println("d1: ", d1)
-	// fmt.Println("d2: ", d2)
-	// log.Println("registered] ", dev)
-	// waitCh <- true
+	return dev["did"].(string), nil
 }
