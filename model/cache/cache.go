@@ -42,10 +42,29 @@ func AddSvc(did, dname, sname string) error {
 	return nil
 }
 
-func GetSvcList(sname string) ([]*devicemeta, bool) {
+func GetSvcList() map[string][]*devicemeta {
 	fmt.Println("GetSvcList(): ", svcs)
+	return svcs
+}
+
+func GetDevicesOnSvc(sname string) []*model.Device {
 	list, ok := svcs[sname]
-	return list, ok
+	if !ok {
+		return nil
+	}
+
+	devList := make([]*model.Device, len(list))
+	for i, e := range list {
+		device := &model.Device{
+			DID:   e.Did,
+			DName: e.Dname,
+			CID:   e.Cid,
+		}
+
+		devList[i] = device
+	}
+
+	return devList
 }
 
 func RemoveDeviceFromSvc(did string) error {

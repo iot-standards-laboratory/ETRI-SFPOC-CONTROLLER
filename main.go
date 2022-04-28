@@ -94,7 +94,7 @@ func deviceManagerSetup() {
 		defer log.Println("exit onDiscovered()")
 		// do register procedure
 		//check already registered device
-
+		cid := config.Params["cid"].(string)
 		var did string
 		var err error
 		did, err = model.DefaultDB.GetDeviceID(dname)
@@ -108,13 +108,14 @@ func deviceManagerSetup() {
 				return err
 			}
 
-			cid := config.Params["cid"].(string)
-			model.DefaultDB.AddDevice(&model.Device{
+			dev := &model.Device{
 				DID:   did,
 				DName: dname,
 				SName: sname,
 				CID:   cid,
-			})
+			}
+
+			model.DefaultDB.AddDevice(dev)
 		} else {
 			log.Println("device is already registered")
 		}
@@ -150,13 +151,25 @@ func deviceManagerSetup() {
 				fmt.Println("code: ", rcvMsg["code"])
 				if rcvMsg["code"].(float64)-1.0 < 0.0001 {
 					// register success
-					ctrl := makeDeviceController(port, did, dname)
+					ctrl := makeDeviceController(port, did, dname, sname)
 					cache.AddDeviceController(dname, ctrl)
 					cache.AddSvc(did, dname, sname)
 					sid, err := querySvcID(sname)
 					if err == nil {
-						log.Println("add sevice ", sname, "'s id : ", sid)
+						// add service id to cache and subscribe service
 						cache.AddSvcId(sname, sid)
+
+						// register device to service if service is running
+						dev := &model.Device{
+							DID:   did,
+							DName: dname,
+							SName: sname,
+							CID:   cid,
+						}
+						err = registerDeviceToService(sid, dev)
+						if err != nil {
+							log.Println(err)
+						}
 					} else {
 						log.Println(err)
 					}
@@ -189,7 +202,38 @@ func deviceManagerSetup() {
 	go devmanager.Watch()
 }
 
-func makeDeviceController(port io.ReadWriter, did, dname string) devmanager.DeviceControllerI {
+func registerDeviceToService(sid string, dev *model.Device) error {
+
+	body, err := json.Marshal(dev)
+	if err != nil {
+		return err
+	}
+
+	log.Println("register to : ", sid)
+	// register device to service
+	resp, err := http.Post(
+		fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"].(string), sid, "api/v1/"),
+		"application/json",
+		bytes.NewReader(body),
+	)
+
+	if err != nil {
+		return err
+	}
+
+	respMsg, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	log.Println(respMsg)
+	if resp.StatusCode > 300 {
+		return errors.New(string(respMsg))
+	} else {
+		return nil
+	}
+}
+
+func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanager.DeviceControllerI {
 
 	// model.AddDeviceController 에서 등록된 디바이스 목록에 해당 디바이스 추가할 것!!
 	ctrl := devmanager.NewDeviceController(port, dname, did)
@@ -197,6 +241,39 @@ func makeDeviceController(port io.ReadWriter, did, dname string) devmanager.Devi
 	ctrl.AddOnRecv(func(e devmanager.Event) {
 		// call when msg recv
 		fmt.Println(e)
+		cid := config.Params["cid"].(string)
+		b, err := json.Marshal(map[string]interface{}{
+			"did":    did,
+			"cid":    cid,
+			"status": e,
+		})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		sid, ok := cache.GetSvcId(sname)
+		if ok {
+			// send request to "http://server/svc/{service_id}/api/v1/"
+			req, err := http.NewRequest(
+				"PUT",
+				fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"], sid, "api/v1/"),
+				bytes.NewReader(b),
+			)
+
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			_, err = http.DefaultClient.Do(req)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+		}
+
 	})
 
 	ctrl.AddOnClose(func(dname, did string, ctrl devmanager.DeviceControllerI) error {
@@ -268,8 +345,19 @@ func manageSubscribe() {
 				log.Println(err.Error())
 				return
 			}
-			log.Println("add", sname, "id :", sid)
+			// add service id to cache and subscribe service
 			cache.AddSvcId(sname, sid)
+
+			// register devices to service if service is running
+			cache.GetSvcList()
+
+			devList := cache.GetDevicesOnSvc(sname)
+			for _, e := range devList {
+				err = registerDeviceToService(sid, e)
+				if err != nil {
+					log.Println(err)
+				}
+			}
 		}
 	})
 }
