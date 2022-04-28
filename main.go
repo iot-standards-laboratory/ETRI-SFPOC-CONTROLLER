@@ -59,9 +59,36 @@ func register() (string, error) {
 	return payload["cid"].(string), nil
 }
 
-func querySvcsListFromEdge() {
+// return sid or error with record not found
+func querySvcID(sname string) (string, error) {
 
+	// get svc id
+	req, err := http.NewRequest(
+		"GET",
+		fmt.Sprintf("http://%s/%s", config.Params["serverAddr"], "api/v1/svcs"),
+		nil,
+	)
+
+	if err != nil {
+		return "", err
+	}
+	req.Header.Add("sname", sname)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	} else if resp.StatusCode != 200 {
+		b, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+		return "", errors.New(string(b))
+	}
+
+	b, err := ioutil.ReadAll(resp.Body)
+	return string(b), err
 }
+
 func deviceManagerSetup() {
 	devmanager.AddOnDiscovered(func(port io.ReadWriter, sname, dname string) error {
 		defer log.Println("exit onDiscovered()")
@@ -126,6 +153,14 @@ func deviceManagerSetup() {
 					ctrl := makeDeviceController(port, did, dname)
 					cache.AddDeviceController(dname, ctrl)
 					cache.AddSvc(did, dname, sname)
+					sid, err := querySvcID(sname)
+					if err == nil {
+						log.Println("add sevice ", sname, "'s id : ", sid)
+						cache.AddSvcId(sname, sid)
+					} else {
+						log.Println(err)
+					}
+
 					ctrl.Run()
 					okchan <- nil
 					return
@@ -222,23 +257,23 @@ func manageSubscribe() {
 			return
 		}
 
-		if key == "service is registered" {
-			fmt.Println("service is registered!!")
+		if key == "service" {
+			sname, ok := event["value"].(string)
+			if !ok {
+				return
+			}
+
+			sid, err := querySvcID(sname)
+			if err != nil {
+				log.Println(err.Error())
+				return
+			}
+			log.Println("add", sname, "id :", sid)
+			cache.AddSvcId(sname, sid)
 		}
 	})
 }
 func main() {
-	config.LoadConfig()
-	cid := config.Params["cid"].(string)
-	if cid == "blank" {
-		var err error
-		cid, err = register()
-		if err != nil {
-			panic(err)
-		}
-
-		config.Set("cid", cid)
-	}
 
 	cfg := flag.Bool("init", false, "create initial config file")
 	flag.Parse()
@@ -255,7 +290,19 @@ func main() {
 		return
 	}
 
-	// manageSubscribe()
+	config.LoadConfig()
+	cid := config.Params["cid"].(string)
+	if cid == "blank" {
+		var err error
+		cid, err = register()
+		if err != nil {
+			panic(err)
+		}
+
+		config.Set("cid", cid)
+	}
+
+	manageSubscribe()
 	deviceManagerSetup()
 	go devManagerTest()
 	router.NewRouter().Run(config.Params["bind"].(string))

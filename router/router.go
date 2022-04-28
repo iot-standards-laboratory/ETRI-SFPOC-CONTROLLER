@@ -22,7 +22,10 @@ func NewRouter() *gin.Engine {
 	apiv1 := apiEngine.Group("api/v1")
 	{
 		apiv1.PUT("/devs", PutDevice)
+
+		// for debug api
 		apiv1.GET("/svcs", GetServiceList)
+		apiv1.GET("/svcids", GetServiceIds)
 		// apiv1.POST("/devs/discover", PostDevice)
 	}
 

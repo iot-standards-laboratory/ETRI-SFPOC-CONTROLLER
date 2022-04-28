@@ -1,7 +1,6 @@
 package common
 
 import (
-	"encoding/json"
 	"etri-sfpoc-controller/config"
 	"fmt"
 	"log"
@@ -38,14 +37,6 @@ func Subscribe(path, token string, handler func(parmas []byte)) {
 				return
 			}
 
-			obj := map[string]interface{}{}
-			err = json.Unmarshal(message, &obj)
-			if err != nil {
-				log.Println("read:", err)
-				return
-			}
-
-			log.Printf("recv: %s", obj["value"].(map[string]interface{})["did"].(string))
 			if handler != nil {
 				handler(message)
 			}

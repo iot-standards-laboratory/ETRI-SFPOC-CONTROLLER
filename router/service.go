@@ -24,3 +24,13 @@ func GetServiceList(c *gin.Context) {
 	c.JSON(http.StatusOK, list)
 
 }
+
+func GetServiceIds(c *gin.Context) {
+	defer handleError(c)
+
+	w := c.Writer
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+	c.JSON(http.StatusOK, cache.GetSvcIds())
+}

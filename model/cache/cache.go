@@ -72,6 +72,7 @@ func RemoveDeviceFromSvc(did string) error {
 			list[i] = list[len(svcs)-1]
 			if len(list)-1 == 0 {
 				delete(svcs, sname)
+				removeSvcId(sname)
 			} else {
 				svcs[sname] = list[:len(list)-1]
 			}
@@ -85,7 +86,7 @@ func RemoveDeviceFromSvc(did string) error {
 func subcribeSvc(sid string) {
 	cid := config.Params["cid"].(string)
 
-	go common.Subscribe("/push/v1/", cid, func(payload []byte) {
+	common.Subscribe("/push/v1/", cid, func(payload []byte) {
 		cmdJson := map[string]interface{}{}
 		err := json.Unmarshal(payload, &cmdJson)
 		if err != nil {
@@ -146,18 +147,28 @@ func AddSvcId(sname, sid string) error {
 	svcIds[sname] = sid
 
 	// start subscribing the service
-	subcribeSvc(sid)
+	// subcribeSvc(sid)
 	return nil
 }
 
 func GetSvcId(sname string) (string, bool) {
+	svcIdMutex.Lock()
+	defer svcIdMutex.Unlock()
 	id, ok := svcIds[sname]
 	return id, ok
 }
 
+func GetSvcIds() map[string]string {
+	// unsubscribe service
+	// Todo
+	return svcIds
+}
+
 // if all devices managed by service with the sname is removed, this method is called
 func removeSvcId(sname string) {
-
+	svcIdMutex.Lock()
+	defer svcIdMutex.Unlock()
+	delete(svcIds, sname)
 }
 
 func AddDeviceController(dname string, ctrl devmanager.DeviceControllerI) {
