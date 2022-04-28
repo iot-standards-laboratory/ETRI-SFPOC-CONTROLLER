@@ -38,7 +38,6 @@ func AddSvc(did, dname, sname string) error {
 		Cid:   config.Params["cid"].(string),
 	})
 
-	fmt.Println("AddSvcs(): ", svcs)
 	return nil
 }
 
@@ -104,47 +103,49 @@ func RemoveDeviceFromSvc(did string) error {
 
 func subcribeSvc(sid string) {
 	cid := config.Params["cid"].(string)
-
-	common.Subscribe("/push/v1/", cid, func(payload []byte) {
-		cmdJson := map[string]interface{}{}
-		err := json.Unmarshal(payload, &cmdJson)
-		if err != nil {
-			return
-		}
-
-		key, ok := cmdJson["key"].(string)
-		if !ok {
-			return
-		}
-
-		if key == "control" {
-			value, ok := cmdJson["value"].(map[string]interface{})
-			if !ok {
-				return
-			}
-			did, ok := value["did"].(string)
-			if !ok {
-				return
-			}
-
-			dev, err := model.DefaultDB.GetDevice(did)
+	go common.Subscribe(
+		fmt.Sprintf("svc/%s/%s", sid, "push/v1/"),
+		cid,
+		func(payload []byte) {
+			cmdJson := map[string]interface{}{}
+			err := json.Unmarshal(payload, &cmdJson)
 			if err != nil {
 				return
 			}
 
-			ctrl, err := GetDeviceController(dev.DName)
-			if err != nil {
-				panic(err)
-			}
-
-			status, ok := value["status"].(map[string]interface{})
-			fmt.Println(status)
+			key, ok := cmdJson["key"].(string)
 			if !ok {
 				return
 			}
-			ctrl.Sync(status)
-		}
-	})
+
+			if key == "control" {
+				value, ok := cmdJson["value"].(map[string]interface{})
+				if !ok {
+					return
+				}
+				did, ok := value["did"].(string)
+				if !ok {
+					return
+				}
+
+				dev, err := model.DefaultDB.GetDevice(did)
+				if err != nil {
+					return
+				}
+
+				ctrl, err := GetDeviceController(dev.DName)
+				if err != nil {
+					panic(err)
+				}
+
+				status, ok := value["status"].(map[string]interface{})
+				fmt.Println(status)
+				if !ok {
+					return
+				}
+				ctrl.Sync(status)
+			}
+		})
 }
 
 var svcIds = map[string]string{} // svcIds[sname] = sid
@@ -166,7 +167,7 @@ func AddSvcId(sname, sid string) error {
 	svcIds[sname] = sid
 
 	// start subscribing the service
-	// subcribeSvc(sid)
+	subcribeSvc(sid)
 	return nil
 }
 

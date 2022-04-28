@@ -211,8 +211,9 @@ func registerDeviceToService(sid string, dev *model.Device) error {
 
 	log.Println("register to : ", sid)
 	// register device to service
+	fmt.Printf("http://%s/svc/%s/%s\n", config.Params["serverAddr"].(string), sid, "api/v1/dev")
 	resp, err := http.Post(
-		fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"].(string), sid, "api/v1/"),
+		fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"].(string), sid, "api/v1/dev"),
 		"application/json",
 		bytes.NewReader(body),
 	)
@@ -240,12 +241,11 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 
 	ctrl.AddOnRecv(func(e devmanager.Event) {
 		// call when msg recv
-		fmt.Println(e)
 		cid := config.Params["cid"].(string)
 		b, err := json.Marshal(map[string]interface{}{
 			"did":    did,
 			"cid":    cid,
-			"status": e,
+			"status": e.Params()["body"],
 		})
 		if err != nil {
 			log.Println(err)
@@ -257,7 +257,7 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 			// send request to "http://server/svc/{service_id}/api/v1/"
 			req, err := http.NewRequest(
 				"PUT",
-				fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"], sid, "api/v1/"),
+				fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"], sid, "api/v1/status"),
 				bytes.NewReader(b),
 			)
 
