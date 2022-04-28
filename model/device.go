@@ -53,12 +53,12 @@ func (s *_DBHandler) GetDeviceID(dname string) (string, error) {
 	return device.DID, nil
 }
 
-func (s *_DBHandler) GetServiceForDevice(did string) (string, error) {
-	var device Device
-	tx := s.db.Select("sname").First(&device, "did=?", did)
-	if tx.Error != nil {
-		return "", tx.Error
-	}
+// func (s *_DBHandler) GetServiceForDevice(did string) (string, error) {
+// 	var device Device
+// 	tx := s.db.Select("sname").First(&device, "did=?", did)
+// 	if tx.Error != nil {
+// 		return "", tx.Error
+// 	}
 
-	return s.GetSID(device.SName)
-}
+// 	return cache.GetSID(device.SName)
+// }

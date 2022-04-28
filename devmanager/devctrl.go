@@ -25,7 +25,7 @@ type deviceController struct {
 	cmdCh       chan Event
 	ackCh       chan string
 	onRecv      func(e Event)
-	onClose     func(dname string, did string, ctrl DeviceControllerI) error
+	onClose     func(dname, did string, ctrl DeviceControllerI) error
 }
 
 func NewDeviceController(port io.ReadWriter, dname, did string) DeviceControllerI {
