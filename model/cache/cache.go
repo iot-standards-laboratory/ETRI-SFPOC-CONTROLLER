@@ -99,7 +99,7 @@ func RemoveDeviceFromSvc(did string) error {
 	// remove sname entity when the service
 }
 
-func subcribeSvc(sid string) context.CancelFunc {
+func subcribeSvc(sname, sid string) context.CancelFunc {
 	cid := config.Params["cid"].(string)
 	ctx, cancel := context.WithCancel(context.Background())
 	go commonutils.Subscribe(
@@ -145,7 +145,11 @@ func subcribeSvc(sid string) context.CancelFunc {
 				}
 				ctrl.Sync(status)
 			}
-		})
+		},
+		func() {
+			removeSvcId(sname)
+		},
+	)
 
 	return cancel
 }
@@ -170,7 +174,7 @@ func AddSvcId(sname, sid string) error {
 	svcIds[sname] = sid
 
 	// start subscribing the service
-	cancels[sname] = subcribeSvc(sid)
+	cancels[sname] = subcribeSvc(sname, sid)
 	return nil
 }
 

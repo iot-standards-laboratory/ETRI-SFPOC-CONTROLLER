@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-func Subscribe(ctx context.Context, path, token string, handler func(parmas []byte)) {
+func Subscribe(ctx context.Context, path, token string, handler func(parmas []byte), disconnectedHandler func()) {
 	fmt.Println("token: ", token)
 	var addr = config.Params["serverAddr"].(string)
 
@@ -43,6 +43,9 @@ func Subscribe(ctx context.Context, path, token string, handler func(parmas []by
 	for {
 		select {
 		case <-done:
+			if disconnectedHandler != nil {
+				disconnectedHandler()
+			}
 			return
 
 		case <-ctx.Done():

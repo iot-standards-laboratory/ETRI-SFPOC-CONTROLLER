@@ -386,10 +386,18 @@ func manageSubscribe() context.CancelFunc {
 				}
 			}
 		}
-	})
+	},
+		func() {
+			log.Println("connection with edge server is disconnected")
+			log.Println("please restart after edge server is restarted")
+			interrupt <- os.Interrupt
+		},
+	)
 
 	return cancel
 }
+
+var interrupt chan os.Signal
 
 func main() {
 
@@ -440,7 +448,7 @@ func main() {
 	go router.NewRouter().Run(config.Params["bind"].(string))
 
 	// waiting interrupt
-	interrupt := make(chan os.Signal, 1)
+	interrupt = make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
 	<-interrupt
@@ -451,8 +459,6 @@ func main() {
 	if cancel != nil {
 		cancel()
 	}
-
-	return
 }
 
 func devManagerTest() {
