@@ -106,6 +106,7 @@ func subcribeSvc(sname, sid string) context.CancelFunc {
 		ctx,
 		fmt.Sprintf("svc/%s/%s", sid, "push/v1/"),
 		cid,
+		cid,
 		func(payload []byte) {
 			cmdJson := map[string]interface{}{}
 			err := json.Unmarshal(payload, &cmdJson)

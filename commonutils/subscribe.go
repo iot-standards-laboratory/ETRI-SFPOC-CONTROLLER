@@ -5,19 +5,22 @@ import (
 	"etri-sfpoc-controller/config"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 
 	"github.com/gorilla/websocket"
 )
 
-func Subscribe(ctx context.Context, path, token string, handler func(parmas []byte), disconnectedHandler func()) {
+func Subscribe(ctx context.Context, path, token, cid string, handler func(parmas []byte), disconnectedHandler func()) {
 	fmt.Println("token: ", token)
 	var addr = config.Params["serverAddr"].(string)
 
 	u := url.URL{Scheme: "ws", Host: addr, Path: path + token}
 	log.Printf("connecting to %s", u.String())
 
-	c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
+	header := http.Header{}
+	header.Add("cid", cid)
+	c, _, err := websocket.DefaultDialer.Dial(u.String(), header)
 	if err != nil {
 		log.Fatal("dial:", err)
 	}

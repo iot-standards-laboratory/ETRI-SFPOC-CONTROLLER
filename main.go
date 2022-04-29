@@ -356,46 +356,50 @@ func manageSubscribe() context.CancelFunc {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	go commonutils.Subscribe(ctx, "/push/v1/", notifier.SubtokenStatusChanged, func(payload []byte) {
-		// fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
-		event := map[string]interface{}{}
-		err := json.Unmarshal(payload, &event)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+	go commonutils.Subscribe(
+		ctx,
+		"/push/v1/", notifier.SubtokenStatusChanged,
+		config.Params["cid"].(string),
+		func(payload []byte) {
+			// fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
+			event := map[string]interface{}{}
+			err := json.Unmarshal(payload, &event)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 
-		key, ok := event["key"].(string)
-		if !ok {
-			return
-		}
-
-		if key == "service" {
-			sname, ok := event["value"].(string)
+			key, ok := event["key"].(string)
 			if !ok {
 				return
 			}
 
-			sid, err := querySvcID(sname)
-			if err != nil {
-				log.Println(err.Error())
-				return
-			}
-			// add service id to cache and subscribe service
-			cache.AddSvcId(sname, sid)
+			if key == "service" {
+				sname, ok := event["value"].(string)
+				if !ok {
+					return
+				}
 
-			// register devices to service if service is running
-			cache.GetSvcList()
-
-			devList := cache.GetDevicesOnSvc(sname)
-			for _, e := range devList {
-				err = registerDeviceToService(sname, e)
+				sid, err := querySvcID(sname)
 				if err != nil {
-					log.Println(err)
+					log.Println(err.Error())
+					return
+				}
+				// add service id to cache and subscribe service
+				cache.AddSvcId(sname, sid)
+
+				// register devices to service if service is running
+				cache.GetSvcList()
+
+				devList := cache.GetDevicesOnSvc(sname)
+				for _, e := range devList {
+					err = registerDeviceToService(sname, e)
+					if err != nil {
+						log.Println(err)
+					}
 				}
 			}
-		}
-	},
+		},
 		func() {
 			log.Println("connection with edge server is disconnected")
 			log.Println("please restart after edge server is restarted")
@@ -444,6 +448,22 @@ func main() {
 		}
 
 		config.Set("cid", cid)
+	} else {
+		resp, err := http.Post(
+			fmt.Sprintf("http://%s/api/v1/ctrls/%s", config.Params["serverAddr"], cid),
+			"application/json",
+			nil,
+		)
+
+		if err != nil {
+			panic(err)
+		} else if resp.StatusCode >= 300 {
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				panic(err)
+			}
+			panic(errors.New(string(b)))
+		}
 	}
 
 	var cancel context.CancelFunc = nil
