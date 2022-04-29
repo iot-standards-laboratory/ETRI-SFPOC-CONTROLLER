@@ -136,7 +136,18 @@ func deviceManagerSetup() {
 
 			model.DefaultDB.AddDevice(dev)
 		} else {
-			log.Println("device is already registered")
+			dev := &model.Device{
+				DID:   did,
+				DName: dname,
+				SName: sname,
+				CID:   cid,
+			}
+
+			fmt.Println("POSTDEVICETOEDGE")
+			err := devmanager.PostDeviceToEdge(dev)
+			if err != nil {
+				log.Println(err.Error())
+			}
 		}
 
 		// send request to server for registration of device
@@ -304,33 +315,38 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 	ctrl.AddOnClose(func(dname, did string, ctrl devmanager.DeviceControllerI) error {
 		// call when msg recv
 
+		cid := config.Params["cid"].(string)
 		// send request to server for deletion of device
-		// bodyB, err := json.Marshal(map[string]interface{}{
-		// 	"dname": dname,
-		// 	"did":   did,
-		// })
-		// if err != nil {
-		// 	return err
-		// }
+		bodyB, err := json.Marshal(map[string]interface{}{
+			"cid": cid,
+			"did": did,
+		})
+		if err != nil {
+			return err
+		}
 
-		// req, err := http.NewRequest(
-		// 	"DELETE",
-		// 	fmt.Sprintf("http://%s/api/v1/devs", config.Params["serverAddr"].(string)),
-		// 	bytes.NewReader(bodyB),
-		// )
-		// if err != nil {
-		// 	return err
-		// }
+		req, err := http.NewRequest(
+			"DELETE",
+			fmt.Sprintf("http://%s/api/v1/devs", config.Params["serverAddr"].(string)),
+			bytes.NewReader(bodyB),
+		)
+		if err != nil {
+			return err
+		}
 
-		// resp, err := http.DefaultClient.Do(req)
-		// if err != nil {
-		// 	return err
-		// }
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
 
-		// b, err := ioutil.ReadAll(resp.Body)
-		// if err != nil {
-		// 	return err
-		// }
+		if resp.StatusCode > 300 {
+			b, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			log.Println(string(b))
+		}
 
 		// log.Println(string(b))
 
