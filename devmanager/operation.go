@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-func RegisterDevice(dev map[string]interface{}) (string, error) {
+func RegisterDeviceToEdge(dev map[string]interface{}) (string, error) {
 
 	dev["cid"] = config.Params["cid"]
 	b, err := json.Marshal(dev)

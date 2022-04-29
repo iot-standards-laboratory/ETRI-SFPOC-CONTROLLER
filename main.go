@@ -3,9 +3,10 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
-	"etri-sfpoc-controller/common"
+	"etri-sfpoc-controller/commonutils"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/devmanager"
 	"etri-sfpoc-controller/model"
@@ -19,8 +20,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func register() (string, error) {
@@ -62,6 +66,11 @@ func register() (string, error) {
 // return sid or error with record not found
 func querySvcID(sname string) (string, error) {
 
+	if strings.Compare(config.Params["mode"].(string), string(config.STANDALONE)) == 0 {
+		sid, _ := config.Params["sid"].(string)
+		return sid, nil
+	}
+
 	// get svc id
 	req, err := http.NewRequest(
 		"GET",
@@ -99,13 +108,23 @@ func deviceManagerSetup() {
 		var err error
 		did, err = model.DefaultDB.GetDeviceID(dname)
 		if err != nil {
-			did, err = devmanager.RegisterDevice(map[string]interface{}{
-				"sname": sname,
-				"dname": dname,
-			})
-			if err != nil {
-				log.Println(err.Error())
-				return err
+			if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
+				fmt.Println("register device to edge")
+				did, err = devmanager.RegisterDeviceToEdge(map[string]interface{}{
+					"sname": sname,
+					"dname": dname,
+				})
+				if err != nil {
+					log.Println(err.Error())
+					return err
+				}
+			} else {
+				_uuid, err := uuid.NewUUID()
+				if err != nil {
+					log.Println(err)
+					return err
+				}
+				did = _uuid.String()
 			}
 
 			dev := &model.Device{
@@ -166,7 +185,7 @@ func deviceManagerSetup() {
 							SName: sname,
 							CID:   cid,
 						}
-						err = registerDeviceToService(sid, dev)
+						err = registerDeviceToService(sname, dev)
 						if err != nil {
 							log.Println(err)
 						}
@@ -202,18 +221,22 @@ func deviceManagerSetup() {
 	go devmanager.Watch()
 }
 
-func registerDeviceToService(sid string, dev *model.Device) error {
+func registerDeviceToService(sname string, dev *model.Device) error {
 
 	body, err := json.Marshal(dev)
 	if err != nil {
 		return err
 	}
 
-	log.Println("register to : ", sid)
+	svcUrl, err := cache.GetSvcUrls(sname, "/api/v1/devs")
+	if err != nil {
+		return err
+	}
+	log.Println("send device registration request to", svcUrl)
 	// register device to service
-	fmt.Printf("http://%s/svc/%s/%s\n", config.Params["serverAddr"].(string), sid, "api/v1/dev")
+
 	resp, err := http.Post(
-		fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"].(string), sid, "api/v1/dev"),
+		svcUrl,
 		"application/json",
 		bytes.NewReader(body),
 	)
@@ -235,12 +258,13 @@ func registerDeviceToService(sid string, dev *model.Device) error {
 }
 
 func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanager.DeviceControllerI {
-
+	fmt.Println("makeDeviceController()")
 	// model.AddDeviceController 에서 등록된 디바이스 목록에 해당 디바이스 추가할 것!!
 	ctrl := devmanager.NewDeviceController(port, dname, did)
 
 	ctrl.AddOnRecv(func(e devmanager.Event) {
 		// call when msg recv
+		fmt.Println(e.Params())
 		cid := config.Params["cid"].(string)
 		b, err := json.Marshal(map[string]interface{}{
 			"did":    did,
@@ -252,26 +276,27 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 			return
 		}
 
-		sid, ok := cache.GetSvcId(sname)
-		if ok {
-			// send request to "http://server/svc/{service_id}/api/v1/"
-			req, err := http.NewRequest(
-				"PUT",
-				fmt.Sprintf("http://%s/svc/%s/%s", config.Params["serverAddr"], sid, "api/v1/status"),
-				bytes.NewReader(b),
-			)
+		svcUrl, err := cache.GetSvcUrls(sname, "/api/v1/status")
+		if err != nil {
+			log.Println(err.Error())
+			return
+		}
+		// send request to "http://server/svc/{service_id}/api/v1/"
+		req, err := http.NewRequest(
+			"PUT",
+			svcUrl,
+			bytes.NewReader(b),
+		)
 
-			if err != nil {
-				log.Println(err)
-				return
-			}
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
-			_, err = http.DefaultClient.Do(req)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-
+		_, err = http.DefaultClient.Do(req)
+		if err != nil {
+			log.Println(err)
+			return
 		}
 
 	})
@@ -318,9 +343,11 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 	return ctrl
 }
 
-func manageSubscribe() {
+func manageSubscribe() context.CancelFunc {
 
-	go common.Subscribe("/push/v1/", notifier.SubtokenStatusChanged, func(payload []byte) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	go commonutils.Subscribe(ctx, "/push/v1/", notifier.SubtokenStatusChanged, func(payload []byte) {
 		// fmt.Println("SUBTOKENSTATUSCHANGED: ", string(payload))
 		event := map[string]interface{}{}
 		err := json.Unmarshal(payload, &event)
@@ -353,14 +380,17 @@ func manageSubscribe() {
 
 			devList := cache.GetDevicesOnSvc(sname)
 			for _, e := range devList {
-				err = registerDeviceToService(sid, e)
+				err = registerDeviceToService(sname, e)
 				if err != nil {
 					log.Println(err)
 				}
 			}
 		}
 	})
+
+	return cancel
 }
+
 func main() {
 
 	cfg := flag.Bool("init", false, "create initial config file")
@@ -379,21 +409,50 @@ func main() {
 	}
 
 	config.LoadConfig()
+
 	cid := config.Params["cid"].(string)
 	if cid == "blank" {
 		var err error
-		cid, err = register()
-		if err != nil {
-			panic(err)
+		if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
+			cid, err = register()
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			_uuid, err := uuid.NewUUID()
+			if err != nil {
+				panic(err)
+			}
+			cid = _uuid.String()
 		}
 
 		config.Set("cid", cid)
 	}
 
-	manageSubscribe()
+	var cancel context.CancelFunc = nil
+	if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
+		cancel = manageSubscribe()
+	}
+
 	deviceManagerSetup()
 	go devManagerTest()
-	router.NewRouter().Run(config.Params["bind"].(string))
+
+	go router.NewRouter().Run(config.Params["bind"].(string))
+
+	// waiting interrupt
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+
+	<-interrupt
+	log.Println("receive interrupt")
+
+	// do something before program exit
+	// websocket close
+	if cancel != nil {
+		cancel()
+	}
+
+	return
 }
 
 func devManagerTest() {

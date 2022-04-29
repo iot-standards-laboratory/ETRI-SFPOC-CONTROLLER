@@ -133,12 +133,14 @@ func (ctrl *deviceController) recv() {
 		recvObj := map[string]interface{}{}
 		err = json.Unmarshal(b, &recvObj)
 
+		if recvObj["code"] == 2.0 {
+			ctrl.ackCh <- recvObj["token"].(string)
+			continue
+		}
+
 		if err == nil && ctrl.onRecv != nil {
 			ctrl.onRecv(NewEvent(recvObj, "recv"))
 		}
 
-		if recvObj["code"] == 2.0 {
-			ctrl.ackCh <- recvObj["token"].(string)
-		}
 	}
 }

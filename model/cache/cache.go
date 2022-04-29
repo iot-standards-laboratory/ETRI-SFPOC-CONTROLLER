@@ -1,18 +1,16 @@
 package cache
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
-	"etri-sfpoc-controller/common"
+	"etri-sfpoc-controller/commonutils"
 	"etri-sfpoc-controller/config"
-	"etri-sfpoc-controller/devmanager"
 	"etri-sfpoc-controller/model"
 	"fmt"
+	"strings"
 	"sync"
 )
-
-var devCtrls = map[string]devmanager.DeviceControllerI{}
-var ctrlMutex sync.Mutex
 
 type devicemeta struct {
 	Did   string `json:"did"`
@@ -101,9 +99,11 @@ func RemoveDeviceFromSvc(did string) error {
 	// remove sname entity when the service
 }
 
-func subcribeSvc(sid string) {
+func subcribeSvc(sid string) context.CancelFunc {
 	cid := config.Params["cid"].(string)
-	go common.Subscribe(
+	ctx, cancel := context.WithCancel(context.Background())
+	go commonutils.Subscribe(
+		ctx,
 		fmt.Sprintf("svc/%s/%s", sid, "push/v1/"),
 		cid,
 		func(payload []byte) {
@@ -146,8 +146,11 @@ func subcribeSvc(sid string) {
 				ctrl.Sync(status)
 			}
 		})
+
+	return cancel
 }
 
+var cancels = map[string]context.CancelFunc{}
 var svcIds = map[string]string{} // svcIds[sname] = sid
 var svcIdMutex sync.Mutex
 
@@ -167,7 +170,7 @@ func AddSvcId(sname, sid string) error {
 	svcIds[sname] = sid
 
 	// start subscribing the service
-	subcribeSvc(sid)
+	cancels[sname] = subcribeSvc(sid)
 	return nil
 }
 
@@ -189,29 +192,38 @@ func removeSvcId(sname string) {
 	svcIdMutex.Lock()
 	defer svcIdMutex.Unlock()
 	delete(svcIds, sname)
+
+	cancel, ok := cancels[sname]
+	if ok {
+		cancel()
+		delete(cancels, sname)
+	}
 }
 
-func AddDeviceController(dname string, ctrl devmanager.DeviceControllerI) {
+func GetSvcUrls(sname, path string) (string, error) {
 
-	ctrlMutex.Lock()
-	defer ctrlMutex.Unlock()
-	devCtrls[dname] = ctrl
-
-}
-
-func GetDeviceController(dname string) (devmanager.DeviceControllerI, error) {
-	ctrl, ok := devCtrls[dname]
-	if !ok {
-		return nil, errors.New("does not exist error")
+	if path[0] != '/' {
+		return "", errors.New("path should start '/'")
 	}
 
-	return ctrl, nil
-}
+	var sid string
+	var ok bool
+	if strings.Compare(config.Params["mode"].(string), string(config.STANDALONE)) == 0 {
 
-func RemoveDeviceController(dname string) {
-	ctrlMutex.Lock()
-	defer ctrlMutex.Unlock()
-	delete(devCtrls, dname)
+		sid, ok = config.Params["sid"].(string)
+		if !ok {
+			return "", errors.New("sid is blank")
+		} else if strings.Compare(sid, "blank") == 0 {
+			return "", errors.New("sid is blank")
+		}
+	} else {
+		sid, ok = GetSvcId(sname)
+		if !ok {
+			return "", errors.New("sid is blank")
+		}
+	}
+
+	return fmt.Sprintf("http://%s/svc/%s%s", config.Params["serverAddr"], sid, path), nil
 }
 
 // func (s *_DBHandler) GetSID(sname string) (string, error) {

@@ -14,9 +14,11 @@ var Params = map[string]interface{}{}
 func LoadConfig() {
 	p := properties.MustLoadFile("./config.properties", properties.UTF8)
 	Params["serverAddr"] = p.GetString("serverAddr", "localhost:3000")
+	Params["mode"] = p.GetString("mode", "standalone")
 	Params["bind"] = p.GetString("bind", ":4000")
 	Params["cname"] = p.GetString("cname", "controllerA")
 	Params["cid"] = p.GetString("cid", "blank")
+	Params["sid"] = p.GetString("sid", "blank")
 }
 
 func CreateInitFile() {
@@ -28,9 +30,11 @@ func CreateInitFile() {
 
 	p := properties.NewProperties()
 	p.SetValue("serverAddr", "localhost:3000")
+	p.SetValue("mode", STANDALONE)
 	p.SetValue("bind", ":4000")
 	p.SetValue("cname", "controllerA")
 	p.SetValue("cid", "blank")
+	p.SetValue("sid", "blank")
 	p.Write(f, properties.UTF8)
 
 }
@@ -44,6 +48,7 @@ func Set(key, value string) {
 		p = properties.MustLoadFile("./config.properties", properties.UTF8)
 		os.Remove("./config.properties")
 	}
+
 	f, err := os.Create("./config.properties")
 	if err != nil {
 		panic(err)
