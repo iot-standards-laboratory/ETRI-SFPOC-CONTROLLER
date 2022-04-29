@@ -136,15 +136,8 @@ func deviceManagerSetup() {
 
 			model.DefaultDB.AddDevice(dev)
 		} else {
-			dev := &model.Device{
-				DID:   did,
-				DName: dname,
-				SName: sname,
-				CID:   cid,
-			}
-
 			fmt.Println("POSTDEVICETOEDGE")
-			err := devmanager.PostDeviceToEdge(dev)
+			err := devmanager.PostDeviceToEdge(did)
 			if err != nil {
 				log.Println(err.Error())
 			}
