@@ -7,6 +7,7 @@ import (
 	"etri-sfpoc-controller/commonutils"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/model"
+	"etri-sfpoc-controller/notifier"
 	"fmt"
 	"strings"
 	"sync"
@@ -108,6 +109,7 @@ func subcribeSvc(sname, sid string) context.CancelFunc {
 		cid,
 		cid,
 		func(payload []byte) {
+
 			cmdJson := map[string]interface{}{}
 			err := json.Unmarshal(payload, &cmdJson)
 			if err != nil {
@@ -120,10 +122,12 @@ func subcribeSvc(sname, sid string) context.CancelFunc {
 			}
 
 			if key == "control" {
+
 				value, ok := cmdJson["value"].(map[string]interface{})
 				if !ok {
 					return
 				}
+
 				did, ok := value["did"].(string)
 				if !ok {
 					return
@@ -148,6 +152,7 @@ func subcribeSvc(sname, sid string) context.CancelFunc {
 			}
 		},
 		func() {
+			notifier.Box.Publish(notifier.NewEvent("disconnect", nil, sname))
 			removeSvcId(sname)
 		},
 	)

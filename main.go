@@ -118,6 +118,10 @@ func deviceManagerSetup() {
 					log.Println(err.Error())
 					return err
 				}
+				err := devmanager.PostDeviceToEdge(did)
+				if err != nil {
+					log.Println(err.Error())
+				}
 			} else {
 				_uuid, err := uuid.NewUUID()
 				if err != nil {
@@ -136,10 +140,12 @@ func deviceManagerSetup() {
 
 			model.DefaultDB.AddDevice(dev)
 		} else {
-			fmt.Println("POSTDEVICETOEDGE")
-			err := devmanager.PostDeviceToEdge(did)
-			if err != nil {
-				log.Println(err.Error())
+			if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
+				fmt.Println("POSTDEVICETOEDGE")
+				err := devmanager.PostDeviceToEdge(did)
+				if err != nil {
+					log.Println(err.Error())
+				}
 			}
 		}
 
@@ -227,6 +233,13 @@ func deviceManagerSetup() {
 
 func registerDeviceToService(sname string, dev *model.Device) error {
 
+	// example of body
+	// {
+	// 	"did": "1ad73898-fe73-4053-8bbd-29a6ac6c9276",
+	// 	"dname": "DEVICE-A-UUID",
+	// 	"cid": "8971e21d-4800-47e4-b50e-691e28d2f701",
+	// 	"sname": "devicemanagera"
+	// }
 	body, err := json.Marshal(dev)
 	if err != nil {
 		return err
@@ -257,6 +270,9 @@ func registerDeviceToService(sname string, dev *model.Device) error {
 	if resp.StatusCode > 300 {
 		return errors.New(string(respMsg))
 	} else {
+		notifier.Box.Publish(
+			notifier.NewEvent("connected", nil, sname),
+		)
 		return nil
 	}
 }
@@ -266,9 +282,68 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 	// model.AddDeviceController 에서 등록된 디바이스 목록에 해당 디바이스 추가할 것!!
 	ctrl := devmanager.NewDeviceController(port, dname, did)
 
+	msmtUrl := ""
+
+	// when called device is registered on service!!
+	subscriber := notifier.NewCallbackSubscriber(
+		did,
+		sname,
+		notifier.SubtypeCont,
+		func(i notifier.IEvent) {
+			if strings.Compare(i.Title(), "connected") == 0 {
+
+				svcUrl, err := cache.GetSvcUrls(sname, "/api/v1/status")
+				if err != nil {
+					log.Println(err.Error())
+					return
+				}
+
+				log.Println("service is connected!! :", svcUrl)
+
+				b, _ := json.Marshal(map[string]interface{}{
+					"did":   did,
+					"dname": dname,
+					"cid":   config.Params["cid"],
+				})
+				// send request to "http://server/svc/{service_id}/api/v1/"
+				req, err := http.NewRequest(
+					"POST",
+					svcUrl,
+					bytes.NewReader(b),
+				)
+
+				if err != nil {
+					log.Println(err)
+					return
+				}
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					log.Println(err)
+					return
+				} else if resp.StatusCode >= 300 {
+					log.Println(err)
+					return
+				}
+
+				b, err = ioutil.ReadAll(resp.Body)
+				if err != nil {
+					log.Println(err)
+					return
+				}
+
+				msmtUrl = svcUrl + "/" + string(b)
+			} else {
+				log.Println("connection with service is disconnected")
+				msmtUrl = ""
+			}
+		},
+	)
+
+	notifier.Box.AddSubscriber(subscriber)
 	ctrl.AddOnRecv(func(e devmanager.Event) {
 		// call when msg recv
-		fmt.Println(e.Params())
+
 		cid := config.Params["cid"].(string)
 		b, err := json.Marshal(map[string]interface{}{
 			"did":    did,
@@ -280,27 +355,23 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 			return
 		}
 
-		svcUrl, err := cache.GetSvcUrls(sname, "/api/v1/status")
-		if err != nil {
-			log.Println(err.Error())
-			return
-		}
-		// send request to "http://server/svc/{service_id}/api/v1/"
-		req, err := http.NewRequest(
-			"PUT",
-			svcUrl,
-			bytes.NewReader(b),
-		)
+		if len(msmtUrl) != 0 {
+			req, err := http.NewRequest(
+				"PUT",
+				msmtUrl,
+				bytes.NewReader(b),
+			)
 
-		if err != nil {
-			log.Println(err)
-			return
-		}
+			if err != nil {
+				log.Println(err)
+				return
+			}
 
-		_, err = http.DefaultClient.Do(req)
-		if err != nil {
-			log.Println(err)
-			return
+			_, err = http.DefaultClient.Do(req)
+			if err != nil {
+				log.Println(err)
+				return
+			}
 		}
 
 	})
@@ -308,44 +379,46 @@ func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanag
 	ctrl.AddOnClose(func(dname, did string, ctrl devmanager.DeviceControllerI) error {
 		// call when msg recv
 
-		cid := config.Params["cid"].(string)
-		// send request to server for deletion of device
-		bodyB, err := json.Marshal(map[string]interface{}{
-			"cid": cid,
-			"did": did,
-		})
-		if err != nil {
-			return err
-		}
-
-		req, err := http.NewRequest(
-			"DELETE",
-			fmt.Sprintf("http://%s/api/v1/devs", config.Params["serverAddr"].(string)),
-			bytes.NewReader(bodyB),
-		)
-		if err != nil {
-			return err
-		}
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-
-		if resp.StatusCode > 300 {
-			b, err := ioutil.ReadAll(resp.Body)
+		if len(msmtUrl) != 0 {
+			cid := config.Params["cid"].(string)
+			// send request to server for deletion of device
+			bodyB, err := json.Marshal(map[string]interface{}{
+				"cid": cid,
+				"did": did,
+			})
 			if err != nil {
 				return err
 			}
 
-			log.Println(string(b))
-		}
+			req, err := http.NewRequest(
+				"DELETE",
+				fmt.Sprintf("http://%s/api/v1/devs", config.Params["serverAddr"].(string)),
+				bytes.NewReader(bodyB),
+			)
+			if err != nil {
+				return err
+			}
 
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return err
+			}
+
+			if resp.StatusCode > 300 {
+				b, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					return err
+				}
+
+				log.Println(string(b))
+			}
+		}
 		// log.Println(string(b))
 
 		// delete controller from cache
 		cache.RemoveDeviceController(dname)
 		cache.RemoveDeviceFromSvc(did)
+		notifier.Box.RemoveSubscriber(subscriber)
 		return nil
 	})
 
@@ -448,13 +521,12 @@ func main() {
 		}
 
 		config.Set("cid", cid)
-	} else {
+	} else if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
 		resp, err := http.Post(
 			fmt.Sprintf("http://%s/api/v1/ctrls/%s", config.Params["serverAddr"], cid),
 			"application/json",
 			nil,
 		)
-
 		if err != nil {
 			panic(err)
 		} else if resp.StatusCode >= 300 {
