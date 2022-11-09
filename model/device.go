@@ -1,11 +1,8 @@
 package model
 
 import (
-	"etrisfpocdatamodel"
 	"fmt"
 )
-
-type Device etrisfpocdatamodel.Device
 
 func (s *_DBHandler) GetDevices() ([]*Device, int, error) {
 	var devices []*Device

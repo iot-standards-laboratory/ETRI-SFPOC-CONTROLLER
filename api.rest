@@ -1,0 +1,3 @@
+@ctrlAddr = localhost:4000
+
+POST http://{{ctrlAddr}}/api/v2/init

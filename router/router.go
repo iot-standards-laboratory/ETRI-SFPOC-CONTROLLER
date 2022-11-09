@@ -1,7 +1,7 @@
 package router
 
 import (
-	"etri-sfpoc-controller/router/apiv1"
+	"etri-sfpoc-controller/statmgmt"
 	"net/http"
 	"strings"
 
@@ -21,28 +21,24 @@ func init() {
 func NewRouter() *gin.Engine {
 	apiEngine := gin.New()
 
-	v1 := apiEngine.Group("api/v1")
-	{
-		v1.PUT("/devs", apiv1.PutDevice)
-		// // for debug api
-		// apiv1.GET("/svcs", GetServiceList)
-		// apiv1.GET("/svcids", GetServiceIds)
-		// apiv1.POST("/devs/discover", PostDevice)
-	}
-
 	v2 := apiEngine.Group("api/v2")
 	{
-		v2.GET("/init", func(c *gin.Context) {
-			c.String(http.StatusOK, "Hello")
+		v2.POST("/init", func(c *gin.Context) {
+			// c.String(http.StatusOK, "Hello world")
+			c.Status(http.StatusOK)
 		})
 	}
 
-	// pushEngine := gin.New()
-	// pushEngine.Any("/*any", func(c *gin.Context) {
-	// 	// GetPublish(c)
-	// 	Test(c)
-	// })
 	r := gin.New()
+	r.Use(func(ctx *gin.Context) {
+		if statmgmt.Status() == statmgmt.STATUS_INIT {
+			ctx.JSON(http.StatusTemporaryRedirect, gin.H{
+				"path": "/init",
+			})
+			return
+		}
+		ctx.Next()
+	})
 
 	assetEngine := gin.New()
 	assetEngine.Static("/", "./static")
