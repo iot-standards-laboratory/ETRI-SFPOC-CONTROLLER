@@ -3,9 +3,9 @@ package statmgmt
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"etri-sfpoc-controller/config"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -75,20 +75,73 @@ func Register(accessToken string) error {
 	}
 
 	// 응답 메시지 수신
-	b, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	json.Unmarshal(b, &payload)
+	var body = map[string]interface{}{}
+	dec := json.NewDecoder(resp.Body)
+	dec.Decode(&body)
 
 	// 등록 후 생성된 Controller ID 저장
-	config.Set("cid", payload["cid"].(string))
+	config.Set("cid", body["cid"].(string))
 
 	status = STATUS_DISCONNECTED
 	return nil
 }
 
-func Connect(wsAddr string, consulAddr string) error {
+func Connect() error {
+	cid, ok := config.Params["cid"]
+	if !ok {
+		return errors.New("cid is invalid error")
+	}
+
+	serverAddr, ok := config.Params["serverAddr"]
+	if !ok {
+		return errors.New("server address is invalid error")
+	}
+
+	resp, err := http.Post(
+		fmt.Sprintf("http://%s/api/v2/ctrls/%s", serverAddr, cid),
+		"application/json",
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	var body = map[string]interface{}{}
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&body)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(body)
+	wsAddr, ok := body["wsAddr"].(string)
+	if !ok {
+		return errors.New("invalid params")
+	}
+
+	consulAddr, ok := body["consulAddr"].(string)
+	if !ok {
+		return errors.New("invalid params")
+	}
+
+	var i = 0
+	for i = 0; i < 10; i++ {
+		err := connect(wsAddr, consulAddr)
+		if err == nil {
+			err = nil
+			break
+		}
+		time.Sleep(time.Second * 3)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func connect(wsAddr string, consulAddr string) error {
 	err := connectCentrifuge(wsAddr)
 	if err != nil {
 		return err

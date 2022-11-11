@@ -536,12 +536,14 @@ func main() {
 	}
 	config.LoadConfig()
 
-	// statmgmt.Bootup()
-	// statmgmt.Register("user's access token")
-	err := statmgmt.Connect("ws://dsad:8000/connection/websocket", "http://dsad:9999")
-	if err != nil {
-		panic(err)
-	}
+	statmgmt.Bootup()
+
+	// if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
+	// 	err := statmgmt.Connect()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }
 
 	// var cancel context.CancelFunc = nil
 	// defer func() {

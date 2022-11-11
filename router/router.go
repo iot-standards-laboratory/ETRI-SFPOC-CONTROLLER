@@ -1,8 +1,7 @@
 package router
 
 import (
-	"etri-sfpoc-controller/statmgmt"
-	"net/http"
+	"etri-sfpoc-controller/router/apiv2"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -23,25 +22,22 @@ func NewRouter() *gin.Engine {
 
 	v2 := apiEngine.Group("api/v2")
 	{
-		v2.POST("/init", func(c *gin.Context) {
-			// c.String(http.StatusOK, "Hello world")
-			c.Status(http.StatusOK)
-		})
+		v2.POST("/init", apiv2.POST_init)
 	}
 
 	r := gin.New()
-	r.Use(func(ctx *gin.Context) {
-		if statmgmt.Status() == statmgmt.STATUS_INIT {
-			ctx.JSON(http.StatusTemporaryRedirect, gin.H{
-				"path": "/init",
-			})
-			return
-		}
-		ctx.Next()
-	})
+	// r.Use(func(ctx *gin.Context) {
+	// 	if statmgmt.Status() == statmgmt.STATUS_INIT {
+	// 		ctx.JSON(http.StatusTemporaryRedirect, gin.H{
+	// 			"path": "/init",
+	// 		})
+	// 		return
+	// 	}
+	// 	ctx.Next()
+	// })
 
 	assetEngine := gin.New()
-	assetEngine.Static("/", "./static")
+	assetEngine.Static("/", "./front/build/web")
 	r.Any("/*any", func(c *gin.Context) {
 		path := c.Param("any")
 		if strings.HasPrefix(path, "/api/v1") || strings.HasPrefix(path, "/api/v2") {

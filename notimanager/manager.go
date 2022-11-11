@@ -6,11 +6,13 @@ import (
 	"sync"
 )
 
+var DefaultNotiManager INotiManager = NewNotiManager()
+
 type INotiManager interface {
 	AddSubscriber(s ISubscriber)
 	Publish(e IEvent) bool
 	RemoveSubscriber(s ISubscriber)
-	GetSubscriberList() map[string][]ISubscriber
+	GetSubscriberList() map[uint64][]ISubscriber
 }
 
 type NotiManager struct {
