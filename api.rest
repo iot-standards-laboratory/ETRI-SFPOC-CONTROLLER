@@ -1,8 +1,9 @@
 @ctrlAddr = localhost:4000
 
 POST http://{{ctrlAddr}}/api/v2/init
-access_token: "user's token"
+access_token: "etrismartagriculture"
 
 {
-    "cname": "controllerA"
+    "cname": "controllerA", 
+    "edgeAddress": "dsad:3000"
 }

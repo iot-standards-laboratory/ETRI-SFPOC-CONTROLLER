@@ -1,33 +1,40 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:front/app/components/responsive.dart';
 import 'package:front/constants.dart';
 
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:loading_indicator/loading_indicator.dart';
 
-import '../controllers/login_controller.dart';
+import '../controllers/init_controller.dart';
 
-class LoginView extends GetView<LoginController> {
-  const LoginView({Key? key}) : super(key: key);
+class InitView extends GetView<InitController> {
+  const InitView({Key? key}) : super(key: key);
 
   Widget renderBody(BuildContext context, {required double maxWidth}) {
+    var edgeAddrss = '';
+    var accessToken = '';
+    var controllerName = '';
+
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
       child: Form(
         key: controller.formKey,
+        autovalidateMode: AutovalidateMode.disabled,
         child: Column(
           children: [
-            const Icon(Icons.android, size: 100),
-            const SizedBox(height: 60),
+            const Icon(Icons.android, size: 120),
+            if (!Responsive.isMobile(context)) const SizedBox(height: 10),
             Text(
-              'Hello Again',
+              'Etri Smart Farm',
               style: GoogleFonts.bebasNeue(
                 fontSize: 36,
               ),
             ),
             const SizedBox(height: 10),
             const Text(
-              'Welcome back, you\'ve been missed!',
+              'Welcome our smart farm service!',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 20,
@@ -45,22 +52,67 @@ class LoginView extends GetView<LoginController> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: TextFormField(
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'[0-9a-zA-Z.:]')),
+                      // for version 2 and greater youcan also use this
+                      // FilteringTextInputFormatter.digitsOnly
+                    ],
                     decoration: const InputDecoration(
-                      hintText: "Email",
+                      hintText: "Edge Address",
                       border: InputBorder.none,
                     ),
                     validator: (val) {
                       if (val!.isEmpty) {
-                        return '이메일은 필수사항입니다.';
+                        return 'Edge Address는 필수사항입니다.';
                       }
-                      if (!RegExp(
-                              r'^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$')
-                          .hasMatch(val)) {
-                        return '잘못된 이메일 형식입니다.';
+                      if (!RegExp(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])+(:$[0-9]{3,4,5})')
+                              .hasMatch(val) &&
+                          !RegExp(r'^[0-9a-zA-Z]').hasMatch(val)) {
+                        return '잘못된 주소 형식입니다..';
                       }
                       return null;
                     },
-                    onSaved: (val) {},
+                    onSaved: (val) {
+                      edgeAddrss = val!;
+                    },
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 25.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  border: Border.all(color: Colors.white),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0),
+                  child: TextFormField(
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: "Controller Name",
+                      border: InputBorder.none,
+                    ),
+                    validator: (val) {
+                      if (val!.isEmpty) {
+                        return 'Edge Address는 필수사항입니다.';
+                      }
+                      if (val.contains(' ')) {
+                        return '공백을 포함할 수 없습니다.';
+                      }
+                      return null;
+                    },
+                    onSaved: (val) {
+                      if (val != null) {
+                        // controller.email = val;
+                        controllerName = val;
+                      }
+                    },
                   ),
                 ),
               ),
@@ -79,13 +131,18 @@ class LoginView extends GetView<LoginController> {
                   child: TextFormField(
                     obscureText: true,
                     decoration: const InputDecoration(
-                      hintText: "Password",
+                      hintText: "Access Token",
                       border: InputBorder.none,
                     ),
-                    onSaved: (val) {},
+                    onSaved: (val) {
+                      if (val != null) {
+                        // controller.password = val;
+                        accessToken = val;
+                      }
+                    },
                     validator: (val) {
                       if (val!.isEmpty) {
-                        return '비밀번호는 필수사항입니다.';
+                        return 'Access Token은 필수사항입니다.';
                       }
 
                       if (val.length < 8) {
@@ -110,50 +167,57 @@ class LoginView extends GetView<LoginController> {
                 ),
                 onPressed: () async {
                   if (controller.formKey.currentState!.validate()) {
-                    var dialog = showDialog(
+                    controller.formKey.currentState!.save();
+
+                    showDialog(
                       context: context,
                       builder: (BuildContext context) {
-                        return const Expanded(
-                          child: AlertDialog(
-                            // title: Text('Welcome'),
-                            elevation: 0,
-
-                            backgroundColor: Colors.transparent,
-                            content: Center(
-                              child: SizedBox(
-                                width: 100,
-                                height: 100,
-                                child: LoadingIndicator(
-                                  indicatorType:
-                                      Indicator.ballTrianglePathColoredFilled,
-                                  colors: kDefaultRainbowColors,
-                                ),
+                        return const AlertDialog(
+                          elevation: 0,
+                          backgroundColor: Colors.transparent,
+                          content: Center(
+                            child: SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: LoadingIndicator(
+                                indicatorType:
+                                    Indicator.ballTrianglePathColoredFilled,
+                                colors: kDefaultRainbowColors,
                               ),
                             ),
                           ),
                         );
                       },
                     );
-                    var result = await controller.login();
-                    Future.delayed(const Duration(minutes: 1), () {
-                      Get.back();
-                      if (result) {
-                        Get.snackbar(
-                            "Success", "welcome to smart farm service");
-
+                    var result = await controller.init(
+                      edgeAddress: edgeAddrss,
+                      controllerName: controllerName,
+                      accessToken: accessToken,
+                    );
+                    Future.delayed(const Duration(seconds: 1), () {
+                      Navigator.pop(context, true);
+                      if (result == null) {
+                        // Future.delayed(const Duration(milliseconds: 200), () {
+                        //   Get.offAllNamed("/controller");
+                        // });
+                        Future.delayed(const Duration(milliseconds: 800), () {
+                          Get.snackbar(
+                              "Success", "Agent information is updated");
+                        });
                         return;
                       }
-                      Get.snackbar("Failed", "login process is failed");
+
+                      Get.snackbar("Failed", result);
                     });
                   }
                 },
                 child: const SizedBox(
                   width: double.infinity,
                   child: Padding(
-                    padding: EdgeInsets.all(25.0),
+                    padding: EdgeInsets.all(10.0),
                     child: Center(
                       child: Text(
-                        "Sign in",
+                        "Update",
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -170,7 +234,7 @@ class LoginView extends GetView<LoginController> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Text(
-                  'Not a member?',
+                  'Do you want to init this agent?',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                   ),
@@ -181,7 +245,7 @@ class LoginView extends GetView<LoginController> {
                     padding:
                         EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
                     child: Text(
-                      ' Register Now',
+                      ' Init Now',
                       style: TextStyle(
                         color: Colors.blue,
                         fontWeight: FontWeight.bold,
@@ -201,22 +265,22 @@ class LoginView extends GetView<LoginController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       body: LayoutBuilder(
         builder: (ctx, ctis) {
           return Material(
             color: Colors.transparent,
             child: SafeArea(
               child: Center(
-                child: Container(
-                  padding: const EdgeInsets.only(top: 120),
-                  child: ctis.maxWidth >= 700
-                      ? renderBody(context, maxWidth: 700)
-                      : ctis.maxWidth < 500
-                          ? SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: renderBody(context, maxWidth: 500),
-                            )
-                          : renderBody(context, maxWidth: ctis.maxWidth),
+                child: SingleChildScrollView(
+                  child: Container(
+                    child: ctis.maxWidth >= 700
+                        ? renderBody(context, maxWidth: 700)
+                        : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: renderBody(context, maxWidth: ctis.maxWidth),
+                          ),
+                  ),
                 ),
               ),
             ),

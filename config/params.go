@@ -13,12 +13,11 @@ var Params = map[string]interface{}{}
 
 func LoadConfig() {
 	p := properties.MustLoadFile("./config.properties", properties.UTF8)
-	Params["serverAddr"] = p.GetString("serverAddr", "localhost:3000")
-	Params["mode"] = p.GetString("mode", "standalone")
+	Params["mode"] = p.GetString("mode", "managedbyedge")
 	Params["bind"] = p.GetString("bind", ":4000")
 	Params["cname"] = p.GetString("cname", "controllerA")
+	Params["edgeAddress"] = p.GetString("edgeAddress", "edgeAddress")
 	Params["cid"] = p.GetString("cid", "blank")
-	Params["sid"] = p.GetString("sid", "blank")
 }
 
 func CreateInitFile() {
@@ -29,12 +28,10 @@ func CreateInitFile() {
 	defer f.Close()
 
 	p := properties.NewProperties()
-	p.SetValue("serverAddr", "localhost:3000")
-	p.SetValue("mode", STANDALONE)
+	p.SetValue("mode", MANAGEDBYEDGE)
 	p.SetValue("bind", ":4000")
-	p.SetValue("cname", "controllerA")
+	p.SetValue("cname", "controllerName")
 	p.SetValue("cid", "blank")
-	p.SetValue("sid", "blank")
 	p.Write(f, properties.UTF8)
 
 }

@@ -5,21 +5,28 @@ import (
 	"errors"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/statmgmt"
+	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang/glog"
 )
 
 func POST_init(c *gin.Context) {
 	defer handleError(c)
+
+	w := c.Writer
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
 	if statmgmt.Status() != statmgmt.STATUS_INIT {
 		panic(errors.New("invalid url"))
 	}
+
 	accessTkn := c.GetHeader("access_token")
-	if len(accessTkn) <= 0 {
+	if len(accessTkn) <= 0 || strings.Compare(accessTkn, "etrismartfarm") != 0 {
 		panic(errors.New("access token is invalid error"))
 	}
-	glog.Infof("accessTkn is", accessTkn)
+	// glog.Infof("accessTkn is", accessTkn)
 
 	var body = map[string]interface{}{}
 	dec := json.NewDecoder(c.Request.Body)
@@ -29,8 +36,13 @@ func POST_init(c *gin.Context) {
 	if !ok {
 		panic(errors.New("container name is invalid error"))
 	}
+	edgeAddress, ok := body["edgeAddress"]
+	if !ok {
+		panic(errors.New("container name is invalid error"))
+	}
 
 	config.Set("cname", cname.(string))
+	config.Set("edgeAddress", edgeAddress.(string))
 
 	err := statmgmt.Register(accessTkn)
 	if err != nil {
@@ -38,4 +50,23 @@ func POST_init(c *gin.Context) {
 	}
 
 	go statmgmt.Connect()
+}
+
+func DELETE_init(c *gin.Context) {
+	defer handleError(c)
+
+	w := c.Writer
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+
+	accessTkn := c.GetHeader("access_token")
+	if len(accessTkn) <= 0 || strings.Compare(accessTkn, "etrismartfarm") != 0 {
+		panic(errors.New("access token is invalid error"))
+	}
+	// glog.Infof("accessTkn is", accessTkn)
+
+	os.Remove("./config.properties")
+
+	// db 초기화
+	// Edge 초기화
 }

@@ -61,7 +61,7 @@ func Register(accessToken string) error {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"POST",
-		fmt.Sprintf("http://%s/%s", config.Params["serverAddr"], "api/v2/ctrls"),
+		fmt.Sprintf("http://%s/%s", config.Params["edgeAddress"], "api/v2/ctrls"),
 		bytes.NewReader(b),
 	)
 	if err != nil {
@@ -92,13 +92,13 @@ func Connect() error {
 		return errors.New("cid is invalid error")
 	}
 
-	serverAddr, ok := config.Params["serverAddr"]
+	edgeAddress, ok := config.Params["edgeAddress"]
 	if !ok {
 		return errors.New("server address is invalid error")
 	}
 
 	resp, err := http.Post(
-		fmt.Sprintf("http://%s/api/v2/ctrls/%s", serverAddr, cid),
+		fmt.Sprintf("http://%s/api/v2/ctrls/%s", edgeAddress, cid),
 		"application/json",
 		nil,
 	)

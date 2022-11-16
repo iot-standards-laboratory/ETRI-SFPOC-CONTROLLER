@@ -8,6 +8,7 @@ import 'constants.dart';
 
 void main() {
   serverAddr = kIsWeb ? '${Uri.base.host}:${Uri.base.port}' : 'localhost:4000';
+  // serverAddr = 'localhost:4000';
 
   runApp(
     GetMaterialApp(

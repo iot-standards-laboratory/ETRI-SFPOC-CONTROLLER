@@ -538,12 +538,12 @@ func main() {
 
 	statmgmt.Bootup()
 
-	// if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
-	// 	err := statmgmt.Connect()
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
+	if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
+		err := statmgmt.Connect()
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	// var cancel context.CancelFunc = nil
 	// defer func() {
