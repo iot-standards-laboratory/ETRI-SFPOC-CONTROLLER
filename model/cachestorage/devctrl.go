@@ -6,20 +6,19 @@ import (
 	"sync"
 )
 
-
-var devCtrls = map[string]devmanager.DeviceControllerI{}
+var devCtrls = map[uint64]devmanager.DeviceControllerI{}
 var ctrlMutex sync.Mutex
 
-func AddDeviceController(dname string, ctrl devmanager.DeviceControllerI) {
+func AddDeviceController(ctrl devmanager.DeviceControllerI) {
 
 	ctrlMutex.Lock()
 	defer ctrlMutex.Unlock()
-	devCtrls[dname] = ctrl
+	devCtrls[ctrl.Key()] = ctrl
 
 }
 
-func GetDeviceController(dname string) (devmanager.DeviceControllerI, error) {
-	ctrl, ok := devCtrls[dname]
+func GetDeviceController(key uint64) (devmanager.DeviceControllerI, error) {
+	ctrl, ok := devCtrls[key]
 	if !ok {
 		return nil, errors.New("does not exist error")
 	}
@@ -27,8 +26,8 @@ func GetDeviceController(dname string) (devmanager.DeviceControllerI, error) {
 	return ctrl, nil
 }
 
-func RemoveDeviceController(dname string) {
+func RemoveDeviceController(key uint64) {
 	ctrlMutex.Lock()
 	defer ctrlMutex.Unlock()
-	delete(devCtrls, dname)
+	delete(devCtrls, key)
 }

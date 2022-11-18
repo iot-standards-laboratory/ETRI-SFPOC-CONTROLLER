@@ -24,11 +24,9 @@ func connectCentrifuge(wsAddr string) error {
 	token, _ := centrifuge_api.IssueJWT(cid.(string), cname.(string), "ctrl", "/", nil)
 
 	connectedHandler := func(e centrifuge.ConnectedEvent) {
-		fmt.Println("connected!!")
 	}
 
 	disconnectedHandler := func(e centrifuge.DisconnectedEvent) {
-		fmt.Println("disconnected!!")
 	}
 
 	err := centrifuge_api.NewClient(

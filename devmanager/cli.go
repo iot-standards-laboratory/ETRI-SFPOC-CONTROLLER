@@ -1,28 +1,20 @@
 package devmanager
 
 import (
-	"bufio"
 	"context"
-	"encoding/json"
-	"io"
-	"log"
-	"time"
+	"strings"
 
-	"github.com/jacobsa/go-serial/serial"
+	"io"
+
+	"github.com/rjeczalik/notify"
 )
 
 var ctx context.Context
 var cancel context.CancelFunc
 
-var onDiscovered func(port io.ReadWriter, sname, dname string) error = nil
+var onConnected func(e string) = nil
 
-var onConnected func(e Event) = nil
-
-func AddOnDiscovered(h func(port io.ReadWriter, sname, dname string) error) {
-	onDiscovered = h
-}
-
-func AddOnConnected(h func(e Event)) {
+func AddOnConnected(h func(e string)) {
 	onConnected = h
 }
 
@@ -35,96 +27,47 @@ func Close() {
 }
 
 func Watch() error {
-	var err error
-	iface, err := discoverDevice()
-	if err == nil {
-		// onDiscover
-		if onConnected != nil {
-			onConnected(NewEvent(map[string]interface{}{"port": iface}, "onConnected"))
-		}
-		go discover(iface)
-	} else if err.Error() != "not found device" {
+	err := initDiscoverDevice()
+	if err != nil {
 		return err
 	}
+
+	filter := make(chan notify.EventInfo, 1)
+	if err := notify.Watch("/dev", filter, notify.Create); err != nil {
+		return err
+	}
+
+	defer notify.Stop(filter)
 
 	for {
-		iface, err = WatchNewDevice(ctx)
-		if err == nil {
-			// onDiscover
-			go discover(iface)
-		} else if err.Error() != "not found device" {
-			return err
-		}
-	}
-}
-
-func discover(iface string) error {
-
-	defer log.Println("exit discover()")
-	err := changePermission(iface)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	options := serial.OpenOptions{
-		PortName:        iface,
-		BaudRate:        115200,
-		DataBits:        8,
-		StopBits:        1,
-		MinimumReadSize: 16,
-	}
-
-	port, err := serial.Open(options)
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	reader := bufio.NewReader(port)
-	// encoder := json.NewEncoder(port)
-
-	sndMsg := map[string]interface{}{}
-	sndMsg["code"] = 0
-	sndMsg["token"], err = GetToken()
-	if err != nil {
-		log.Println(err)
-		return err
-	}
-
-	for {
-		line, _, err := reader.ReadLine()
-		if err != nil {
-			log.Println(err)
-			return err
-		}
-		rcvMsg := map[string]interface{}{}
-		err = json.Unmarshal(line, &rcvMsg)
-		if err == nil {
-			if rcvMsg["code"] == 1.0 {
-				port.Write([]byte(`{"code": 255, "token": "initial", "mode": 0}`))
-				time.Sleep(time.Second)
-				continue
-			}
-
-			if onDiscovered != nil {
-				return onDiscovered(port, rcvMsg["sname"].(string), rcvMsg["uuid"].(string))
-			}
-
+		select {
+		case <-ctx.Done():
 			return nil
+		case e := <-filter:
+			if strings.Contains(e.Path(), "/dev/ttyACM") || strings.Contains(e.Path(), "/dev/ttyUSB") {
+				go onConnected(e.Path())
+			}
 		}
 	}
-	// return nil
 }
 
-// func Write(obj interface{}) error {
-// 	if port == nil {
-// 		return errors.New("device is not connected")
-// 	}
-// 	enc := json.NewEncoder(port)
-// 	err := enc.Encode(obj)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
+func readMessage(reader io.Reader) (int, []byte, error) {
+	buf := make([]byte, 255)
+	b := make([]byte, 1)
+	len := 0
+
+	var err error
+	for {
+		_, err = reader.Read(b)
+		if err != nil {
+			return 254, nil, err
+		}
+
+		if b[0] == 255 {
+			return int(buf[0]), buf[1:len], nil
+		}
+
+		buf[len] = b[0]
+		len++
+	}
+}

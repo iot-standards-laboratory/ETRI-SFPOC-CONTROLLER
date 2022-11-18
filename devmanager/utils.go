@@ -1,10 +1,8 @@
 package devmanager
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"hash/crc64"
 	"io/ioutil"
@@ -12,8 +10,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/rjeczalik/notify"
 )
 
 type Token []byte
@@ -28,7 +24,7 @@ func (t Token) Hash() uint64 {
 
 // GetToken generates a random token by a given length
 func GetToken() (Token, error) {
-	b := make([]byte, 4)
+	b := make([]byte, 1)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.
 	if err != nil {
@@ -38,39 +34,21 @@ func GetToken() (Token, error) {
 	return b, nil
 }
 
-func discoverDevice() (string, error) {
+func initDiscoverDevice() error {
 	fs, err := ioutil.ReadDir("/dev")
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	for _, f := range fs {
 		if strings.Contains(f.Name(), "ttyACM") || strings.Contains(f.Name(), "ttyUSB") {
-			return filepath.Join("/dev", f.Name()), nil
-		}
-	}
-
-	return "", errors.New("not found device")
-}
-
-func WatchNewDevice(ctx context.Context) (string, error) {
-	log.Println("Watching device")
-	filter := make(chan notify.EventInfo, 1)
-	if err := notify.Watch("/dev", filter, notify.Create); err != nil {
-		return "", err
-	}
-	defer notify.Stop(filter)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return "", nil
-		case e := <-filter:
-			if strings.Contains(e.Path(), "/dev/ttyACM") || strings.Contains(e.Path(), "/dev/ttyUSB") {
-				return e.Path(), nil
+			if onConnected != nil {
+				go onConnected(filepath.Join("/dev", f.Name()))
 			}
 		}
 	}
+
+	return nil
 }
 
 func changePermission(iface string) error {
