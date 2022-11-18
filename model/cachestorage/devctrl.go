@@ -3,6 +3,7 @@ package cachestorage
 import (
 	"errors"
 	"etri-sfpoc-controller/devmanager"
+	"log"
 	"sync"
 )
 
@@ -14,7 +15,7 @@ func AddDeviceController(ctrl devmanager.DeviceControllerI) {
 	ctrlMutex.Lock()
 	defer ctrlMutex.Unlock()
 	devCtrls[ctrl.Key()] = ctrl
-
+	log.Println("added ctrl:", devCtrls)
 }
 
 func GetDeviceController(key uint64) (devmanager.DeviceControllerI, error) {
@@ -30,4 +31,5 @@ func RemoveDeviceController(key uint64) {
 	ctrlMutex.Lock()
 	defer ctrlMutex.Unlock()
 	delete(devCtrls, key)
+	log.Println("removed ctrl:", devCtrls)
 }

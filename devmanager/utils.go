@@ -2,9 +2,7 @@ package devmanager
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"hash/crc64"
 	"io/ioutil"
 	"log"
 	"os/exec"
@@ -12,20 +10,14 @@ import (
 	"strings"
 )
 
-type Token []byte
-
-func (t Token) String() string {
-	return hex.EncodeToString(t)
-}
-
-func (t Token) Hash() uint64 {
-	return crc64.Checksum(t, crc64.MakeTable(crc64.ISO))
-}
-
 // GetToken generates a random token by a given length
-func GetToken() (Token, error) {
-	b := make([]byte, 1)
+func GetMessage(payload []byte) ([]byte, error) {
+	length := len(payload) + 2
+	b := make([]byte, 1, length)
 	_, err := rand.Read(b)
+	// length
+	b = append(b, byte(length+1))
+	b = append(b, payload...)
 	// Note that err == nil only if we read len(b) bytes.
 	if err != nil {
 		return nil, err

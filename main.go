@@ -74,10 +74,21 @@ func main() {
 			log.Println(err)
 			return
 		}
-		ctrl.AddOnRecv(func(e interface{}) {
+		ctrl.AddOnUpdate(func(e interface{}) {
 			fmt.Println(e)
 		})
-		ctrl.Run()
+
+		ctrl.AddOnError(func(e error) {
+			if e.Error() == "EOF" {
+				log.Println("EOF error!!")
+				ctrl.Close()
+			}
+		})
+
+		ctrl.AddOnClose(func(key uint64) {
+			cachestorage.RemoveDeviceController(key)
+		})
+		go ctrl.Run()
 		cachestorage.AddDeviceController(ctrl)
 	})
 

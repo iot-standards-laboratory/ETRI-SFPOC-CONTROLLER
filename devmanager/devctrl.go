@@ -1,33 +1,52 @@
 package devmanager
 
 import (
+	"bytes"
+	"errors"
 	"hash/crc64"
 	"io"
+	"log"
+	"sync"
+	"time"
 )
 
 type DeviceControllerI interface {
 	AddOnUpdate(func(e interface{}))
-	// Sync(code uint8, cmd string) error
+	AddOnError(func(err error))
+	AddOnClose(func(key uint64))
+	Sync(cmd []byte) error
 	Key() uint64
 	Run()
-	// close()
+	Close()
 	// AddOnClose(func(dname string, did string, ctrl DeviceControllerI) error)
 }
 
+const (
+	ControllerStatusReady = iota
+	ControllerStatusRunning
+	ControllerStatusClosing
+)
+
 type deviceController struct {
-	port        io.ReadWriter
-	ctrlName    string
-	latestToken Token
-	ackCh       chan string
-	onUpdate    func(e interface{})
-	onClose     func(dname, did string, ctrl DeviceControllerI) error
+	port     io.ReadWriter
+	ctrlName string
+	status   int
+
+	syncMutex sync.Mutex
+	ackCh     chan uint8
+
+	onUpdate func(e interface{})
+	onError  func(err error)
+	onClose  func(key uint64)
+	done     sync.WaitGroup
 }
 
 func NewDeviceController(port io.ReadWriter, ctrlName string) DeviceControllerI {
 	return &deviceController{
 		port:     port,
 		ctrlName: ctrlName,
-		ackCh:    make(chan string),
+		status:   ControllerStatusReady,
+		ackCh:    make(chan uint8),
 	}
 }
 
@@ -35,121 +54,102 @@ func (ctrl *deviceController) Key() uint64 {
 	return crc64.Checksum([]byte(ctrl.ctrlName), crc64.MakeTable(crc64.ISO))
 }
 
-func (ctrl *deviceController) close() {
-	close(ctrl.ackCh)
+func (ctrl *deviceController) Close() {
+	ctrl.status = ControllerStatusClosing
+
+	ctrl.done.Wait()
+	if ctrl.onClose != nil {
+		ctrl.onClose(ctrl.Key())
+	}
 }
 
 func (ctrl *deviceController) AddOnUpdate(h func(e interface{})) {
 	ctrl.onUpdate = h
 }
 
-func (ctrl *deviceController) AddOnClose(h func(dname string, did string, ctrl DeviceControllerI) error) {
+func (ctrl *deviceController) AddOnError(h func(err error)) {
+	ctrl.onError = h
+}
+
+func (ctrl *deviceController) AddOnClose(h func(key uint64)) {
 	ctrl.onClose = h
 }
 
 func (ctrl *deviceController) Run() {
-	go func() {
-		for {
-			code, msg, err := readMessage(ctrl.port)
-			if err != nil {
-				return
-			}
+	defer log.Println("ctrl", ctrl, "is stoped")
+	ctrl.done.Add(1)
+	defer ctrl.done.Done()
 
+	ctrl.status = ControllerStatusRunning
+	for {
+		if ctrl.status == ControllerStatusClosing {
+			return
+		}
+
+		code, msg, err := readMessage(ctrl.port)
+		if err != nil {
+			if ctrl.onError != nil {
+				go ctrl.onError(err)
+			}
+		}
+
+		if code == 201 {
 			if ctrl.onUpdate != nil {
 				ctrl.onUpdate(
 					map[string]interface{}{
 						"code": code,
-						"msg":  msg,
+						"msg":  string(msg),
 					},
 				)
 			}
+		} else if code == 200 {
+			ctrl.ackCh <- msg[0]
 		}
-	}()
-	// go ctrl.send()
+	}
 }
 
-// func (ctrl *deviceController) Sync(body map[string]interface{}) error {
-// 	var err error
-// 	ctrl.latestToken, err = GetToken()
-// 	if err != nil {
-// 		return err
-// 	}
+func (ctrl *deviceController) Sync(cmd []byte) error {
+	ctrl.syncMutex.Lock()
+	defer ctrl.syncMutex.Unlock()
 
-// 	ctrl.cmdCh <- NewEvent(map[string]interface{}{
-// 		"code":  1,
-// 		"body":  body,
-// 		"token": ctrl.latestToken.String(),
-// 	}, "command")
+	msg, err := GetMessage(cmd)
+	if err != nil {
+		return err
+	}
+	tkn := uint8(msg[0])
+	err = ctrl.writeMessage(msg)
+	if err != nil {
+		return err
+	}
 
-// 	return nil
-// }
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
-// func (ctrl *deviceController) send() {
-// 	enc := json.NewEncoder(ctrl.port)
-// 	// enc := json.NewEncoder(os.Stdout)
-// 	ticker := time.NewTicker(time.Second)
-// 	ticker.Stop()
-// 	defer func() {
-// 		ticker.Stop()
-// 	}()
-// 	var latestParams map[string]interface{}
+	for i := 0; i < 20; i++ {
+		select {
+		case <-ticker.C:
+			log.Println("retransmission command to change mode as timeout")
+			err = ctrl.writeMessage(msg)
+			if err != nil {
+				return err
+			}
+		case ackNum := <-ctrl.ackCh:
+			if ackNum == tkn {
+				return nil
+			}
+		}
+	}
 
-// 	for {
-// 		select {
-// 		case e, ok := <-ctrl.cmdCh:
-// 			if !ok {
-// 				return
-// 			}
-// 			latestParams = e.Params()
-// 			err := enc.Encode(latestParams)
-// 			if err != nil {
-// 				log.Println(err)
-// 			}
+	return errors.New("timeout error")
+}
 
-// 			ticker.Reset(time.Second * 5)
-// 		case tkn, ok := <-ctrl.ackCh:
-// 			if !ok {
-// 				return
-// 			}
-// 			if tkn == ctrl.latestToken.String() {
-// 				fmt.Println("Acked!!")
-// 				ticker.Stop()
-// 			}
-// 		case <-ticker.C:
-// 			fmt.Println("retransmission as timeout : ", latestParams)
-// 			err := enc.Encode(latestParams)
-// 			if err != nil {
-// 				log.Println(err)
-// 			}
-// 		}
-// 	}
+func (ctrl *deviceController) writeMessage(payload []byte) error {
+	buf := bytes.Buffer{}
 
-// }
+	buf.WriteByte(byte(2)) // write code
+	buf.Write(payload)
+	buf.WriteByte(byte(255))
 
-// func (ctrl *deviceController) recv() {
-// 	defer ctrl.close()
-
-// 	reader := bufio.NewReader(ctrl.port)
-
-// 	for {
-// 		b, _, err := reader.ReadLine()
-// 		if err != nil {
-// 			if err == io.EOF {
-// 				log.Println("USB is disconnected")
-// 				return
-// 			}
-// 		}
-// 		recvObj := map[string]interface{}{}
-// 		err = json.Unmarshal(b, &recvObj)
-
-// 		if recvObj["code"] == 2.0 {
-// 			ctrl.ackCh <- recvObj["token"].(string)
-// 			continue
-// 		}
-
-// 		if err == nil && ctrl.onRecv != nil {
-// 			ctrl.onRecv(NewEvent(recvObj, "recv"))
-// 		}
-
-// 	}
-// }
+	_, err := ctrl.port.Write(buf.Bytes())
+	return err
+}
