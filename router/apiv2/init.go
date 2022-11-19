@@ -49,7 +49,7 @@ func POST_init(c *gin.Context) {
 		panic(err)
 	}
 
-	go statmgmt.Connect()
+	// go statmgmt.Connect()
 }
 
 func DELETE_init(c *gin.Context) {

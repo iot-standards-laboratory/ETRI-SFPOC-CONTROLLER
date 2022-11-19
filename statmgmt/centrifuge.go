@@ -1,11 +1,13 @@
 package statmgmt
 
 import (
+	"encoding/json"
 	"errors"
 	"etri-sfpoc-controller/centrifuge_api"
 	"etri-sfpoc-controller/config"
+	"etri-sfpoc-controller/model/cachestorage"
 	"fmt"
-	"log"
+	"hash/crc64"
 
 	"github.com/centrifugal/centrifuge-go"
 )
@@ -47,7 +49,38 @@ func connectCentrifuge(wsAddr string) error {
 
 	sub.OnPublication(func(e centrifuge.PublicationEvent) {
 		// control device
-		log.Printf("Someone says via channel %s: %s (offset %d)", sub.Channel, e.Data, e.Offset)
+		msg := map[string]interface{}{}
+		err := json.Unmarshal(e.Data, &msg)
+		if err != nil {
+			return
+		}
+
+		code, ok := msg["code"].(float64)
+		if !ok {
+			return
+		}
+
+		fmt.Println(code)
+		if code-2.0 < 0.001 {
+			fmt.Println(msg)
+			ctrlName, ok := msg["ctrlName"].(string)
+			if !ok {
+				return
+			}
+
+			fmt.Println(ctrlName)
+			cmd, ok := msg["cmd"].(string)
+			if !ok {
+				return
+			}
+
+			ctrl, err := cachestorage.GetDeviceController(crc64.Checksum([]byte(ctrlName), crc64.MakeTable(crc64.ISO)))
+			if err != nil {
+				return
+			}
+			fmt.Println(cmd)
+			ctrl.Sync([]byte(cmd))
+		}
 	})
 
 	err = sub.Subscribe()

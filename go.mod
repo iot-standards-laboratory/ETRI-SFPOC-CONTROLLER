@@ -9,6 +9,7 @@ replace etrisfpocdatamodel => ../ETRI-SFPOC-DATAMODEL
 require (
 	etrisfpocdatamodel v0.0.0-00010101000000-000000000000
 	github.com/centrifugal/centrifuge-go v0.9.3
+	github.com/eclipse/paho.mqtt.golang v1.4.2
 	github.com/gin-gonic/gin v1.7.7
 	github.com/golang-jwt/jwt/v4 v4.4.2
 	github.com/golang/glog v1.0.0
@@ -57,6 +58,7 @@ require (
 	github.com/ugorji/go/codec v1.1.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect

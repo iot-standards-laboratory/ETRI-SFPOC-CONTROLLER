@@ -117,7 +117,6 @@ func initDevice(port io.ReadWriter) error {
 				return
 			}
 
-			fmt.Println("code: ", code)
 			if code == 200 {
 				okchan <- nil
 				return

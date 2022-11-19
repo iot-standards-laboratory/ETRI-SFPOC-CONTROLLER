@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"etri-sfpoc-controller/config"
+	"etri-sfpoc-controller/mqtthandler"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,7 +22,11 @@ const (
 )
 
 var status = STATUS_INIT
+var bootupChannel chan interface{}
 
+func init() {
+	bootupChannel = make(chan interface{})
+}
 func Status() int {
 	return status
 }
@@ -31,6 +36,7 @@ func Bootup() error {
 	if strings.Compare(cid, "blank") == 0 {
 		if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
 			status = STATUS_INIT
+			<-bootupChannel
 			return nil
 		}
 
@@ -83,6 +89,7 @@ func Register(accessToken string) error {
 	config.Set("cid", body["cid"].(string))
 
 	status = STATUS_DISCONNECTED
+	bootupChannel <- struct{}{}
 	return nil
 }
 
@@ -119,14 +126,19 @@ func Connect() error {
 		return errors.New("invalid params")
 	}
 
-	consulAddr, ok := body["consulAddr"].(string)
+	// consulAddr, ok := body["consulAddr"].(string)
+	// if !ok {
+	// 	return errors.New("invalid params")
+	// }
+
+	mqttAddr, ok := body["mqttAddr"].(string)
 	if !ok {
 		return errors.New("invalid params")
 	}
 
 	var i = 0
 	for i = 0; i < 10; i++ {
-		err := connect(wsAddr, consulAddr)
+		err := connect(wsAddr, mqttAddr)
 		if err == nil {
 			err = nil
 			break
@@ -141,12 +153,27 @@ func Connect() error {
 	return nil
 }
 
-func connect(wsAddr string, consulAddr string) error {
+func connect(wsAddr, mqttAddr string) error {
 	err := connectCentrifuge(wsAddr)
 	if err != nil {
 		return err
 	}
-	err = connectConsul(consulAddr)
+
+	// err = connectConsul(consulAddr)
+	// if err != nil {
+	// 	return err
+	// }
+
+	err = mqtthandler.ConnectMQTT(mqttAddr)
+	if err != nil {
+		return err
+	}
+
+	cid, ok := config.Params["cid"]
+	if !ok {
+		return errors.New("invalid cid error")
+	}
+	err = mqtthandler.Subscribe(fmt.Sprintf("%s/#", cid))
 	if err != nil {
 		return err
 	}

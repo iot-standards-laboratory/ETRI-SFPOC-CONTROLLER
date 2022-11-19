@@ -49,6 +49,7 @@ func main() {
 	}
 	config.LoadConfig()
 
+	go router.NewRouter().Run(config.Params["bind"].(string))
 	statmgmt.Bootup()
 
 	if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
@@ -57,16 +58,6 @@ func main() {
 			panic(err)
 		}
 	}
-
-	// var cancel context.CancelFunc = nil
-	// defer func() {
-	// 	if cancel != nil {
-	// 		cancel()
-	// 	}
-	// }()
-	// if strings.Compare(config.Params["mode"].(string), string(config.MANAGEDBYEDGE)) == 0 {
-	// 	cancel = manageSubscribe()
-	// }
 
 	devmanager.AddOnConnected(func(port string) {
 		ctrl, err := devmanager.DiscoverController(port)
@@ -94,8 +85,6 @@ func main() {
 
 	go devmanager.Watch()
 	// go devManagerTest()
-
-	go router.NewRouter().Run(config.Params["bind"].(string))
 
 	waitInterrupt()
 	// do something before program exit
