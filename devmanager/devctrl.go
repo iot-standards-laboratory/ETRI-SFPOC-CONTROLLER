@@ -15,6 +15,8 @@ type DeviceControllerI interface {
 	AddOnError(func(err error))
 	AddOnClose(func(key uint64))
 	Sync(cmd []byte) error
+	Name() string
+	ServiceName() string
 	Key() uint64
 	Run()
 	Close()
@@ -28,9 +30,10 @@ const (
 )
 
 type deviceController struct {
-	port     io.ReadWriter
-	ctrlName string
-	status   int
+	port        io.ReadWriter
+	ctrlName    string
+	serviceName string
+	status      int
 
 	syncMutex sync.Mutex
 	ackCh     chan uint8
@@ -41,17 +44,26 @@ type deviceController struct {
 	done     sync.WaitGroup
 }
 
-func NewDeviceController(port io.ReadWriter, ctrlName string) DeviceControllerI {
+func NewDeviceController(port io.ReadWriter, ctrlName, serviceName string) DeviceControllerI {
 	return &deviceController{
-		port:     port,
-		ctrlName: ctrlName,
-		status:   ControllerStatusReady,
-		ackCh:    make(chan uint8),
+		port:        port,
+		ctrlName:    ctrlName,
+		serviceName: serviceName,
+		status:      ControllerStatusReady,
+		ackCh:       make(chan uint8),
 	}
+}
+
+func (ctrl *deviceController) Name() string {
+	return ctrl.ctrlName
 }
 
 func (ctrl *deviceController) Key() uint64 {
 	return crc64.Checksum([]byte(ctrl.ctrlName), crc64.MakeTable(crc64.ISO))
+}
+
+func (ctrl *deviceController) ServiceName() string {
+	return ctrl.serviceName
 }
 
 func (ctrl *deviceController) Close() {

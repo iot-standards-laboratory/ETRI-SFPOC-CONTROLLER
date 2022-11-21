@@ -69,7 +69,9 @@ func DiscoverController(iface string) (DeviceControllerI, error) {
 				return nil, err
 			}
 			ctrlName := rcvMsg["uuid"].(string)
-			return NewDeviceController(port, ctrlName), nil
+			serviceName := rcvMsg["sname"].(string)
+			fmt.Println("service name: ", serviceName)
+			return NewDeviceController(port, ctrlName, serviceName), nil
 		} else if code == 201 {
 			_, err = port.Write([]byte{10, byte(rand.Int() % 256), 3, 255})
 			if err != nil {

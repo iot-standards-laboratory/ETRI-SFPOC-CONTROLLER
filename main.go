@@ -101,6 +101,7 @@ func main() {
 		ctrl.AddOnClose(func(key uint64) {
 			cachestorage.RemoveDeviceController(key)
 		})
+
 		go ctrl.Run()
 		cachestorage.AddDeviceController(ctrl)
 	})
