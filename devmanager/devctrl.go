@@ -91,6 +91,8 @@ func (ctrl *deviceController) Run() {
 			if ctrl.onError != nil {
 				go ctrl.onError(err)
 			}
+			time.Sleep(time.Millisecond * 300)
+			continue
 		}
 
 		if code == 201 {

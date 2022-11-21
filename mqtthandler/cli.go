@@ -54,11 +54,11 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 }
 
 func ConnectMQTT(mqttAddr string) error {
-	cid, ok := config.Params["cid"].(string)
+	id, ok := config.Params["id"].(string)
 	if !ok {
-		return errors.New("invalid cid error")
+		return errors.New("invalid id error")
 	}
-	opts := mqtt.NewClientOptions().AddBroker(mqttAddr).SetClientID(cid)
+	opts := mqtt.NewClientOptions().AddBroker(mqttAddr).SetClientID(id)
 
 	opts.SetKeepAlive(60 * time.Second)
 	// Set the message callback handler
@@ -73,6 +73,11 @@ func ConnectMQTT(mqttAddr string) error {
 	}
 
 	return nil
+}
+
+func Publish(topic string, payload []byte) error {
+	tkn := client.Publish(topic, 0, false, payload)
+	return tkn.Error()
 }
 
 func Subscribe(topic string) error {

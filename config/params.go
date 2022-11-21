@@ -15,9 +15,9 @@ func LoadConfig() {
 	p := properties.MustLoadFile("./config.properties", properties.UTF8)
 	Params["mode"] = p.GetString("mode", "managedbyedge")
 	Params["bind"] = p.GetString("bind", ":4000")
-	Params["cname"] = p.GetString("cname", "controllerA")
+	Params["name"] = p.GetString("name", "controllerA")
 	Params["edgeAddress"] = p.GetString("edgeAddress", "edgeAddress")
-	Params["cid"] = p.GetString("cid", "blank")
+	Params["id"] = p.GetString("id", "blank")
 }
 
 func CreateInitFile() {
@@ -30,8 +30,8 @@ func CreateInitFile() {
 	p := properties.NewProperties()
 	p.SetValue("mode", MANAGEDBYEDGE)
 	p.SetValue("bind", ":4000")
-	p.SetValue("cname", "controllerName")
-	p.SetValue("cid", "blank")
+	p.SetValue("name", "agentName")
+	p.SetValue("id", "blank")
 	p.Write(f, properties.UTF8)
 
 }

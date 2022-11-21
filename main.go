@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/devmanager"
 	"etri-sfpoc-controller/model/cachestorage"
+	"etri-sfpoc-controller/mqtthandler"
 	"etri-sfpoc-controller/router"
 	"etri-sfpoc-controller/statmgmt"
-	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -33,23 +34,20 @@ func waitInterrupt() {
 }
 
 func main() {
-	cfg := flag.Bool("init", false, "create initial config file")
-	flag.Parse()
-
-	if *cfg {
-		config.CreateInitFile()
-		return
-	}
-
 	if _, err := os.Stat("./config.properties"); errors.Is(err, os.ErrNotExist) {
 		// path/to/whatever does not exist
 		fmt.Println("config file doesn't exist")
-		fmt.Println("please add -init option to create config file")
-		return
+		config.CreateInitFile()
 	}
 	config.LoadConfig()
 
-	go router.NewRouter().Run(config.Params["bind"].(string))
+	bindAddr, ok := config.Params["bind"].(string)
+	if !ok {
+		bindAddr = ":4000"
+	}
+
+	go router.NewRouter().Run(bindAddr)
+
 	statmgmt.Bootup()
 
 	if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
@@ -66,7 +64,31 @@ func main() {
 			return
 		}
 		ctrl.AddOnUpdate(func(e interface{}) {
-			fmt.Println(e)
+			// upload data to mqtt
+			id, ok := config.Params["id"].(string)
+			if !ok {
+				return
+			}
+
+			_ = id
+			obj := e.(map[string]interface{})
+			msg := obj["msg"].(string)
+			msgObj := map[string]interface{}{}
+			err := json.Unmarshal([]byte(msg), &msgObj)
+			if err != nil {
+				return
+			}
+
+			body := msgObj["body"].(map[string]interface{})
+			bodyBytes, err := json.Marshal(body)
+			if err != nil {
+				return
+			}
+
+			err = mqtthandler.Publish(fmt.Sprintf("%s/%d", id, ctrl.Key()), bodyBytes)
+			if err != nil {
+				return
+			}
 		})
 
 		ctrl.AddOnError(func(e error) {

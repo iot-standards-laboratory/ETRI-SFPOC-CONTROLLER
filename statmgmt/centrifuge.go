@@ -13,17 +13,17 @@ import (
 )
 
 func connectCentrifuge(wsAddr string) error {
-	cid, ok := config.Params["cid"]
+	id, ok := config.Params["id"]
 	if !ok {
-		return errors.New("cid is invalid error")
+		return errors.New("id is invalid error")
 	}
 
-	cname, ok := config.Params["cname"]
+	name, ok := config.Params["name"]
 	if !ok {
-		return errors.New("cname is invalid error")
+		return errors.New("name is invalid error")
 	}
 
-	token, _ := centrifuge_api.IssueJWT(cid.(string), cname.(string), "ctrl", "/", nil)
+	token, _ := centrifuge_api.IssueJWT(id.(string), name.(string), "ctrl", "/", nil)
 
 	connectedHandler := func(e centrifuge.ConnectedEvent) {
 	}
@@ -42,7 +42,7 @@ func connectCentrifuge(wsAddr string) error {
 		return err
 	}
 
-	sub, err := centrifuge_api.AddSubscription(fmt.Sprintf("public:%s", cid))
+	sub, err := centrifuge_api.AddSubscription(fmt.Sprintf("public:%s", id))
 	if err != nil {
 		return err
 	}

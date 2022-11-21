@@ -4,6 +4,6 @@ POST http://{{ctrlAddr}}/api/v2/init
 access_token: "etrismartagriculture"
 
 {
-    "cname": "controllerA", 
+    "name": "agent-A", 
     "edgeAddress": "dsad:3000"
 }

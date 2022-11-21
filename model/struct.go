@@ -1,7 +1,9 @@
 package model
 
-import "etrisfpocdatamodel"
+import (
+	"etrisfpocdatamodel"
+)
 
-type Device etrisfpocdatamodel.Device
 type Controller etrisfpocdatamodel.Controller
+type Agent etrisfpocdatamodel.Agent
 type Service etrisfpocdatamodel.Service

@@ -32,16 +32,16 @@ func POST_init(c *gin.Context) {
 	dec := json.NewDecoder(c.Request.Body)
 	dec.Decode(&body)
 
-	cname, ok := body["cname"]
+	name, ok := body["name"]
 	if !ok {
-		panic(errors.New("container name is invalid error"))
+		panic(errors.New("agent name is invalid error"))
 	}
 	edgeAddress, ok := body["edgeAddress"]
 	if !ok {
-		panic(errors.New("container name is invalid error"))
+		panic(errors.New("edge address is invalid error"))
 	}
 
-	config.Set("cname", cname.(string))
+	config.Set("name", name.(string))
 	config.Set("edgeAddress", edgeAddress.(string))
 
 	err := statmgmt.Register(accessTkn)

@@ -15,7 +15,7 @@ class InitView extends GetView<InitController> {
   Widget renderBody(BuildContext context, {required double maxWidth}) {
     var edgeAddrss = '';
     var accessToken = '';
-    var controllerName = '';
+    var agentName = '';
 
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
@@ -95,7 +95,7 @@ class InitView extends GetView<InitController> {
                   child: TextFormField(
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      hintText: "Controller Name",
+                      hintText: "Agent Name",
                       border: InputBorder.none,
                     ),
                     validator: (val) {
@@ -110,7 +110,7 @@ class InitView extends GetView<InitController> {
                     onSaved: (val) {
                       if (val != null) {
                         // controller.email = val;
-                        controllerName = val;
+                        agentName = val;
                       }
                     },
                   ),
@@ -191,7 +191,7 @@ class InitView extends GetView<InitController> {
                     );
                     var result = await controller.init(
                       edgeAddress: edgeAddrss,
-                      controllerName: controllerName,
+                      agentName: agentName,
                       accessToken: accessToken,
                     );
                     Future.delayed(const Duration(seconds: 1), () {

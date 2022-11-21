@@ -25,7 +25,7 @@ class InitController extends GetxController {
 
   Future<String?> init({
     required String edgeAddress,
-    required String controllerName,
+    required String agentName,
     required String accessToken,
   }) async {
     var url = Uri.http(
@@ -40,7 +40,7 @@ class InitController extends GetxController {
       headers: <String, String>{"access_token": accessToken},
       body: jsonEncode({
         'edgeAddress': edgeAddress,
-        'cname': controllerName,
+        'name': agentName,
       }),
     );
 

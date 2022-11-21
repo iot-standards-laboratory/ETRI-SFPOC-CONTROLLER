@@ -1,7 +1,6 @@
 package consul_api
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -57,25 +56,25 @@ func Connect(consulAgent string) error {
 	return nil
 }
 
-func Monitor(h func(string), ctx context.Context) error {
-	stopCh := make(chan struct{})
-	notificationCh, err := client.Agent().Monitor("", stopCh, &api.QueryOptions{})
-	if err != nil {
-		return err
-	}
+// func Monitor(h func(string), ctx context.Context) error {
+// 	stopCh := make(chan struct{})
+// 	notificationCh, err := client.Agent().Monitor("", stopCh, &api.QueryOptions{})
+// 	if err != nil {
+// 		return err
+// 	}
 
-	for {
-		select {
-		case param := <-notificationCh:
-			if h != nil {
-				h(param)
-			}
-		case <-ctx.Done():
-			stopCh <- struct{}{}
-			return nil
-		}
-	}
-}
+// 	for {
+// 		select {
+// 		case param := <-notificationCh:
+// 			if h != nil {
+// 				h(param)
+// 			}
+// 		case <-ctx.Done():
+// 			stopCh <- struct{}{}
+// 			return nil
+// 		}
+// 	}
+// }
 
 func registerEntity(name, endpoint string) (err error) {
 	agent := client.Agent()

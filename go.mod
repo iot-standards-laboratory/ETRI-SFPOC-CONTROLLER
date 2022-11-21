@@ -20,8 +20,6 @@ require (
 	github.com/magiconair/properties v1.8.6
 	github.com/rjeczalik/notify v0.9.2
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
-	gorm.io/driver/sqlite v1.3.1
-	gorm.io/gorm v1.23.3
 )
 
 require (
@@ -48,7 +46,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
 	github.com/mattn/go-isatty v0.0.12 // indirect
-	github.com/mattn/go-sqlite3 v1.14.9 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
@@ -62,4 +59,5 @@ require (
 	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gorm.io/gorm v1.23.3 // indirect
 )
