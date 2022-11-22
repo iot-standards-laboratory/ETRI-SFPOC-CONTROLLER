@@ -6,7 +6,7 @@ import (
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/model/cachestorage"
 	"fmt"
-	"hash/crc64"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,21 +32,28 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 
 	fmt.Println(code)
 	if code-2.0 < 0.001 {
-		ctrlName := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]
-		fmt.Println(ctrlName)
-		if !ok {
+		ctrlKey := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]
+		if ctrlKey[len(ctrlKey)-1] != 'c' {
 			return
 		}
+
+		ctrlKey = ctrlKey[:len(ctrlKey)-1]
 
 		cmd, ok := obj["cmd"].(string)
 		if !ok {
 			return
 		}
 
-		ctrl, err := cachestorage.GetDeviceController(crc64.Checksum([]byte(ctrlName), crc64.MakeTable(crc64.ISO)))
+		nKey, err := strconv.ParseInt(ctrlKey, 0, 64)
 		if err != nil {
 			return
 		}
+		ctrl, err := cachestorage.GetDeviceController(uint64(nKey))
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		fmt.Println(cmd)
 		ctrl.Sync([]byte(cmd))
 	}

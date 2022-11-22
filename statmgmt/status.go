@@ -136,9 +136,14 @@ func Connect() error {
 		return errors.New("invalid params")
 	}
 
+	origin, ok := body["origin"].(string)
+	if !ok {
+		return errors.New("invalid params")
+	}
+
 	var i = 0
 	for i = 0; i < 10; i++ {
-		err := connect(consulAddr, mqttAddr)
+		err := connect(consulAddr, mqttAddr, origin)
 		if err == nil {
 			err = nil
 			break
@@ -153,13 +158,13 @@ func Connect() error {
 	return nil
 }
 
-func connect(consulAddr, mqttAddr string) error {
+func connect(consulAddr, mqttAddr, origin string) error {
 	// err := connectCentrifuge(wsAddr)
 	// if err != nil {
 	// 	return err
 	// }
 
-	err := connectConsul(consulAddr)
+	err := connectConsul(consulAddr, origin)
 	if err != nil {
 		return err
 	}

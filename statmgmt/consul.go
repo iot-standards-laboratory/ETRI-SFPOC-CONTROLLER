@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-func connectConsul(consulAddr string) error {
+func connectConsul(consulAddr, origin string) error {
 	id, ok := config.Params["id"].(string)
 	if !ok {
 		return errors.New("id is invalid error")
@@ -24,7 +24,7 @@ func connectConsul(consulAddr string) error {
 		return err
 	}
 
-	err = consul_api.RegisterAgent(agent, "http://localhost:4000")
+	err = consul_api.RegisterAgent(agent, fmt.Sprintf("http://%s:4000", origin))
 	if err != nil {
 		return err
 	}
