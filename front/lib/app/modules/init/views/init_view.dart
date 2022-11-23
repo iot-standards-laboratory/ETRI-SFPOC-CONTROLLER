@@ -166,50 +166,50 @@ class InitView extends GetView<InitController> {
                   ),
                 ),
                 onPressed: () async {
-                  if (controller.formKey.currentState!.validate()) {
-                    controller.formKey.currentState!.save();
+                  if (!controller.formKey.currentState!.validate()) {
+                    return;
+                  }
+                  controller.formKey.currentState!.save();
 
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext context) {
-                        return const AlertDialog(
-                          elevation: 0,
-                          backgroundColor: Colors.transparent,
-                          content: Center(
-                            child: SizedBox(
-                              width: 100,
-                              height: 100,
-                              child: LoadingIndicator(
-                                indicatorType:
-                                    Indicator.ballTrianglePathColoredFilled,
-                                colors: kDefaultRainbowColors,
-                              ),
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return const AlertDialog(
+                        elevation: 0,
+                        backgroundColor: Colors.transparent,
+                        content: Center(
+                          child: SizedBox(
+                            width: 100,
+                            height: 100,
+                            child: LoadingIndicator(
+                              indicatorType:
+                                  Indicator.ballTrianglePathColoredFilled,
+                              colors: kDefaultRainbowColors,
                             ),
                           ),
-                        );
-                      },
-                    );
-                    var result = await controller.init(
-                      edgeAddress: edgeAddrss,
-                      agentName: agentName,
-                      accessToken: accessToken,
-                    );
-                    Future.delayed(const Duration(seconds: 1), () {
-                      Navigator.pop(context, true);
-                      if (result == null) {
-                        // Future.delayed(const Duration(milliseconds: 200), () {
-                        //   Get.offAllNamed("/controller");
-                        // });
-                        Future.delayed(const Duration(milliseconds: 800), () {
-                          Get.snackbar(
-                              "Success", "Agent information is updated");
-                        });
-                        return;
-                      }
+                        ),
+                      );
+                    },
+                  );
+                  var result = await controller.initUpdate(
+                    edgeAddress: edgeAddrss,
+                    agentName: agentName,
+                    accessToken: accessToken,
+                  );
+                  Future.delayed(const Duration(seconds: 1), () {
+                    Navigator.pop(context, true);
+                    if (result == null) {
+                      // Future.delayed(const Duration(milliseconds: 200), () {
+                      //   Get.offAllNamed("/controller");
+                      // });
+                      Future.delayed(const Duration(milliseconds: 800), () {
+                        Get.snackbar("Success", "Agent information is updated");
+                      });
+                      return;
+                    }
 
-                      Get.snackbar("Failed", result);
-                    });
-                  }
+                    Get.snackbar("Failed", result);
+                  });
                 },
                 child: const SizedBox(
                   width: double.infinity,
@@ -252,7 +252,51 @@ class InitView extends GetView<InitController> {
                       ),
                     ),
                   ),
-                  onTap: () {},
+                  onTap: () async {
+                    if (!controller.formKey.currentState!.validate()) return;
+                    controller.formKey.currentState!.save();
+
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return const AlertDialog(
+                          elevation: 0,
+                          backgroundColor: Colors.transparent,
+                          content: Center(
+                            child: SizedBox(
+                              width: 100,
+                              height: 100,
+                              child: LoadingIndicator(
+                                indicatorType:
+                                    Indicator.ballTrianglePathColoredFilled,
+                                colors: kDefaultRainbowColors,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                    var result = await controller.init(
+                      edgeAddress: edgeAddrss,
+                      agentName: agentName,
+                      accessToken: accessToken,
+                    );
+                    Future.delayed(const Duration(seconds: 1), () {
+                      Navigator.pop(context, true);
+                      if (result == null) {
+                        // Future.delayed(const Duration(milliseconds: 200), () {
+                        //   Get.offAllNamed("/controller");
+                        // });
+                        Future.delayed(const Duration(milliseconds: 800), () {
+                          Get.snackbar(
+                              "Success", "Agent information is initialized");
+                        });
+                        return;
+                      }
+
+                      Get.snackbar("Failed", result);
+                    });
+                  },
                 ),
               ],
             ),

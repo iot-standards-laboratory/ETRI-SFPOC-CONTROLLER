@@ -29,7 +29,10 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			log.Fatalln(err)
 		}
 
-		os.Exit(0)
+		go func() {
+			time.Sleep(time.Second * 2)
+			os.Exit(0)
+		}()
 	}
 
 	if strings.HasSuffix(msg.Topic(), "/reboot") {
@@ -39,7 +42,10 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			log.Fatalln(err)
 		}
 
-		os.Exit(0)
+		go func() {
+			time.Sleep(time.Second * 2)
+			os.Exit(0)
+		}()
 	}
 
 	ctrlKey := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]

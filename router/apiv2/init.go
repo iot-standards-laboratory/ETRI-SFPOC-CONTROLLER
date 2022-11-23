@@ -72,8 +72,10 @@ func DELETE_init(c *gin.Context) {
 		panic(err)
 	}
 
-	time.Sleep(time.Second * 2)
-	os.Exit(0)
+	go func() {
+		time.Sleep(time.Second * 2)
+		os.Exit(0)
+	}()
 	// db 초기화
 	// Edge 초기화
 }

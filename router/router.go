@@ -23,6 +23,7 @@ func NewRouter() *gin.Engine {
 	v2 := apiEngine.Group("api/v2")
 	{
 		v2.POST("/init", apiv2.POST_init)
+		v2.DELETE("/init", apiv2.DELETE_init)
 	}
 
 	r := gin.New()
