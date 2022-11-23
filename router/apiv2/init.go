@@ -5,8 +5,10 @@ import (
 	"errors"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/statmgmt"
+	"etri-sfpoc-controller/utils"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,8 +67,13 @@ func DELETE_init(c *gin.Context) {
 	}
 	// glog.Infof("accessTkn is", accessTkn)
 
-	os.Remove("./config.properties")
+	err := utils.CMD_Init()
+	if err != nil {
+		panic(err)
+	}
 
+	time.Sleep(time.Second * 2)
+	os.Exit(0)
 	// db 초기화
 	// Edge 초기화
 }

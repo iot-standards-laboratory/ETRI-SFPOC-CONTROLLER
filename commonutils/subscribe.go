@@ -3,7 +3,6 @@ package commonutils
 import (
 	"context"
 	"etri-sfpoc-controller/config"
-	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -12,7 +11,7 @@ import (
 )
 
 func Subscribe(ctx context.Context, path, token, cid string, handler func(parmas []byte), disconnectedHandler func()) {
-	fmt.Println("token: ", token)
+	log.Println("token: ", token)
 	var addr = config.Params["serverAddr"].(string)
 
 	u := url.URL{Scheme: "ws", Host: addr, Path: path + token}

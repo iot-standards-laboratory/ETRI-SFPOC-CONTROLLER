@@ -5,7 +5,9 @@ import (
 	"errors"
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/model/cachestorage"
+	"etri-sfpoc-controller/utils"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -20,6 +22,31 @@ const passwd = "etrismartfarm"
 var client mqtt.Client
 
 var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	if strings.HasSuffix(msg.Topic(), "/init") {
+		log.Println("init!!")
+		err := utils.CMD_Init()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		os.Exit(0)
+	}
+
+	if strings.HasSuffix(msg.Topic(), "/reboot") {
+		log.Println("reboot!!")
+		err := utils.CMD_Reboot()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		os.Exit(0)
+	}
+
+	ctrlKey := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]
+	if ctrlKey[len(ctrlKey)-1] != 'c' {
+		return
+	}
+
 	obj := map[string]interface{}{}
 	err := json.Unmarshal(msg.Payload(), &obj)
 	if err != nil {
@@ -31,12 +58,7 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 		return
 	}
 
-	fmt.Println(code)
 	if code-2.0 < 0.001 {
-		ctrlKey := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]
-		if ctrlKey[len(ctrlKey)-1] != 'c' {
-			return
-		}
 
 		ctrlKey = ctrlKey[:len(ctrlKey)-1]
 
@@ -55,7 +77,6 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			return
 		}
 
-		fmt.Println(cmd)
 		ctrl.Sync([]byte(cmd))
 	}
 
