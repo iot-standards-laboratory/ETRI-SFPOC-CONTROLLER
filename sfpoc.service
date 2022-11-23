@@ -1,0 +1,13 @@
+[Unit]
+Description=Run Smart Farm PoC Controller
+After=multi-user.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/pugit/ETRI-SFPOC-CONTROLLER
+ExecStart=/home/ubuntu/pugit/ETRI-SFPOC-CONTROLLER/controller-app
+Restart=always
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target
