@@ -2,6 +2,7 @@ package consul_api
 
 import (
 	"etri-sfpoc-controller/model"
+	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -40,6 +41,7 @@ func update(check func() (bool, error), agent *api.Agent, name string) {
 		glog.Errorf("err=\"Check failed\" msg=\"%s\"", err.Error())
 		if agentErr := agent.FailTTL("service:"+name, err.Error()); agentErr != nil {
 			glog.Error(agentErr)
+			os.Exit(0)
 		}
 	} else {
 		if agentErr := agent.PassTTL("service:"+name, "healthy"); agentErr != nil {

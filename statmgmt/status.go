@@ -174,14 +174,7 @@ func connect(consulAddr, mqttAddr, origin string) error {
 		return err
 	}
 
-	id, ok := config.Params["id"]
-	if !ok {
-		return errors.New("invalid id error")
-	}
-	err = mqtthandler.Subscribe(fmt.Sprintf("%s/#", id))
-	if err != nil {
-		return err
-	}
+	
 
 	status = STATUS_CONNECTED
 	return nil

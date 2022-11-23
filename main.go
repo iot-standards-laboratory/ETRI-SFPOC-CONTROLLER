@@ -9,6 +9,7 @@ import (
 	"etri-sfpoc-controller/mqtthandler"
 	"etri-sfpoc-controller/router"
 	"etri-sfpoc-controller/statmgmt"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -34,6 +35,7 @@ func waitInterrupt() {
 }
 
 func main() {
+	flag.Parse()
 	if _, err := os.Stat("./config.properties"); errors.Is(err, os.ErrNotExist) {
 		// path/to/whatever does not exist
 		fmt.Println("config file doesn't exist")
@@ -87,6 +89,8 @@ func main() {
 
 			err = mqtthandler.Publish(fmt.Sprintf("%s/%d", id, ctrl.Key()), bodyBytes)
 			if err != nil {
+				log.Println("mqtt is disconnected!!")
+				log.Println(err)
 				return
 			}
 		})

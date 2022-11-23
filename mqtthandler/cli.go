@@ -6,6 +6,7 @@ import (
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/model/cachestorage"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -73,6 +74,19 @@ func ConnectMQTT(mqttAddr string) error {
 	opts.SetPingTimeout(1 * time.Second)
 	opts.SetUsername(user)
 	opts.SetPassword(passwd)
+	opts.SetAutoReconnect(true)
+	opts.SetConnectRetryInterval(time.Duration(time.Second * 5))
+	opts.SetOnConnectHandler(func(c mqtt.Client) {
+		fmt.Println("connect!!")
+		id, ok := config.Params["id"]
+		if !ok {
+			os.Exit(-1)
+		}
+		err := Subscribe(fmt.Sprintf("%s/#", id))
+		if err != nil {
+			os.Exit(-1)
+		}
+	})
 
 	client = mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
