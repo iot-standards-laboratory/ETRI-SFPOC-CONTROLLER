@@ -12,6 +12,7 @@ import (
 )
 
 const maxConnectAttempts = 100
+const acl_token = "62KY7J2YIOycoeuzgOOEsWwg7ZuE7J+dIOOEuOOFj+uKlOuCoAoK7Jyg7KaI66as7ZWYIOy5tOugjCBI7Lu1IOuvvOqwkOuwlOuUlCDshLHqsJDqsJzrsJwKCjMwME1BQU4tNzgwIOyXkHJvIOyduO2UjOujqOyWuOyE"
 
 var client *api.Client = nil
 
@@ -31,6 +32,7 @@ func Connect(consulAgent string) error {
 	if consulAgentUrl.Scheme != "" {
 		consulConfig.Scheme = consulAgentUrl.Scheme
 	}
+	consulConfig.Token = acl_token
 
 	client, err = api.NewClient(consulConfig)
 	if err != nil {
