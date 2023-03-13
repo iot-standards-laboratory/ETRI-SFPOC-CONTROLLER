@@ -1,8 +1,8 @@
 package devmanager
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
 	"hash/crc64"
 	"io"
 	"log"
@@ -11,10 +11,9 @@ import (
 )
 
 type DeviceControllerI interface {
-	AddOnUpdate(func(e interface{}))
 	AddOnError(func(err error))
 	AddOnClose(func(key uint64))
-	Sync(cmd []byte) error
+	Do(code uint8, payload []byte) (int, []byte, error)
 	Name() string
 	ServiceName() string
 	Key() uint64
@@ -30,28 +29,14 @@ const (
 )
 
 type deviceController struct {
-	port        io.ReadWriter
+	port        io.ReadWriteCloser
 	ctrlName    string
 	serviceName string
 	status      int
-
-	syncMutex sync.Mutex
-	ackCh     chan uint8
-
-	onUpdate func(e interface{})
-	onError  func(err error)
-	onClose  func(key uint64)
-	done     sync.WaitGroup
-}
-
-func NewDeviceController(port io.ReadWriter, ctrlName, serviceName string) DeviceControllerI {
-	return &deviceController{
-		port:        port,
-		ctrlName:    ctrlName,
-		serviceName: serviceName,
-		status:      ControllerStatusReady,
-		ackCh:       make(chan uint8),
-	}
+	recvMsgCh   chan []byte
+	onError     func(err error)
+	onClose     func(key uint64)
+	done        sync.WaitGroup
 }
 
 func (ctrl *deviceController) Name() string {
@@ -68,15 +53,11 @@ func (ctrl *deviceController) ServiceName() string {
 
 func (ctrl *deviceController) Close() {
 	ctrl.status = ControllerStatusClosing
-
+	ctrl.port.Close()
 	ctrl.done.Wait()
 	if ctrl.onClose != nil {
 		ctrl.onClose(ctrl.Key())
 	}
-}
-
-func (ctrl *deviceController) AddOnUpdate(h func(e interface{})) {
-	ctrl.onUpdate = h
 }
 
 func (ctrl *deviceController) AddOnError(h func(err error)) {
@@ -88,82 +69,64 @@ func (ctrl *deviceController) AddOnClose(h func(key uint64)) {
 }
 
 func (ctrl *deviceController) Run() {
-	defer log.Println("ctrl", ctrl, "is stoped")
+	defer log.Println("ctrl", ctrl.ctrlName, "is stoped")
 	ctrl.done.Add(1)
 	defer ctrl.done.Done()
 
 	ctrl.status = ControllerStatusRunning
-	for {
-		if ctrl.status == ControllerStatusClosing {
+
+	for ctrl.status != ControllerStatusClosing {
+		b, err := readMessage(ctrl.port)
+		if err != nil {
 			return
 		}
-
-		code, msg, err := readMessage(ctrl.port)
-		if err != nil {
-			if ctrl.onError != nil {
-				go ctrl.onError(err)
-			}
-			time.Sleep(time.Millisecond * 300)
-			continue
-		}
-
-		if code == 201 {
-			if ctrl.onUpdate != nil {
-				ctrl.onUpdate(
-					map[string]interface{}{
-						"code": code,
-						"msg":  string(msg),
-					},
-				)
-			}
-		} else if code == 200 {
-			ctrl.ackCh <- msg[0]
-		}
+		ctrl.recvMsgCh <- b
 	}
 }
 
-func (ctrl *deviceController) Sync(cmd []byte) error {
-	ctrl.syncMutex.Lock()
-	defer ctrl.syncMutex.Unlock()
+func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error) {
 
-	msg, err := GetMessage(cmd)
+	msg, err := getMessage(code, getToken(), payload)
 	if err != nil {
-		return err
-	}
-	tkn := uint8(msg[0])
-	err = ctrl.writeMessage(msg)
-	if err != nil {
-		return err
+		return -1, nil, err
 	}
 
-	ticker := time.NewTicker(5 * time.Second)
+	fmt.Printf("msg[0], msg[1], msg[2]: %d, %d, %d\n", msg[0], msg[1], msg[2])
+	fmt.Println("payload: ", string(payload))
+
+	_, err = ctrl.port.Write(msg)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	for i := 0; i < 20; i++ {
+	for i := 0; i < 5; i++ {
 		select {
 		case <-ticker.C:
-			log.Println("retransmission command to change mode as timeout")
-			err = ctrl.writeMessage(msg)
+			log.Println("retransmission command as timeout")
+			_, err = ctrl.port.Write(msg)
 			if err != nil {
-				return err
+				return -1, nil, err
 			}
-		case ackNum := <-ctrl.ackCh:
-			if ackNum == tkn {
-				return nil
+		case recvMsg, ok := <-ctrl.recvMsgCh:
+			if !ok {
+				return -1, nil, errors.New("channel is closed error")
 			}
+
+			if recvMsg[1] != msg[1] {
+				log.Println("retransmission command as invalid token")
+				_, err = ctrl.port.Write(msg)
+				if err != nil {
+					return -1, nil, err
+				}
+				continue
+			}
+
+			return int(recvMsg[0]), recvMsg[2:], nil
 		}
 	}
 
-	return errors.New("timeout error")
-}
-
-func (ctrl *deviceController) writeMessage(payload []byte) error {
-	buf := bytes.Buffer{}
-
-	buf.WriteByte(byte(2)) // write code
-	buf.Write(payload)
-	buf.WriteByte(byte(255))
-
-	_, err := ctrl.port.Write(buf.Bytes())
-	return err
+	return -1, nil, errors.New("timeout error")
 }

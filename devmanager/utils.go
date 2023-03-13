@@ -1,29 +1,60 @@
 package devmanager
 
 import (
-	"crypto/rand"
+	"bytes"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
-	"os/exec"
+	"math/rand"
 	"path/filepath"
 	"strings"
+
+	"go.bug.st/serial"
 )
 
+func getToken() uint8 {
+	return uint8(rand.Intn(253) + 1)
+}
+
 // GetToken generates a random token by a given length
-func GetMessage(payload []byte) ([]byte, error) {
-	length := len(payload) + 2
-	b := make([]byte, 1, length)
-	_, err := rand.Read(b)
-	// length
-	b = append(b, byte(length+1))
-	b = append(b, payload...)
-	// Note that err == nil only if we read len(b) bytes.
-	if err != nil {
-		return nil, err
+func getMessage(code, token uint8, payload []byte) ([]byte, error) {
+
+	if payload == nil {
+		return []byte{code, token, 255}, nil
 	}
 
+	b := make([]byte, 0, len(payload)+3)
+	length := uint8(len(payload) + 3)
+	b = append(b, code, token, length)
+	b = append(b, payload...)
+	b = append(b, 255)
+	// Note that err == nil only if we read len(b) bytes.
+
 	return b, nil
+}
+
+func readMessage(reader io.ReadCloser) ([]byte, error) {
+	buf := bytes.Buffer{}
+	b := make([]byte, 1)
+	len := 0
+
+	var err error
+	for {
+		_, err = reader.Read(b)
+		if err != nil {
+			return nil, err
+		}
+
+		if b[0] == 255 {
+			return buf.Bytes(), nil
+		}
+
+		buf.Write(b)
+		len++
+	}
 }
 
 func initDiscoverDevice() error {
@@ -34,8 +65,13 @@ func initDiscoverDevice() error {
 
 	for _, f := range fs {
 		if strings.Contains(f.Name(), "ttyACM") || strings.Contains(f.Name(), "ttyUSB") {
+			d, err := discover(filepath.Join("/dev", f.Name()))
+			if err != nil {
+				log.Println(err)
+				continue
+			}
 			if onConnected != nil {
-				go onConnected(filepath.Join("/dev", f.Name()))
+				go onConnected(d)
 			}
 		}
 	}
@@ -43,15 +79,61 @@ func initDiscoverDevice() error {
 	return nil
 }
 
-func changePermission(iface string) error {
-	log.Println("changing the mod of file")
+func discover(iface string) (DeviceControllerI, error) {
+	log.Println("start discover")
+	defer log.Println("exit discover")
 
-	cmd := exec.Command("sudo", "chmod", "a+rw", iface)
-	b, err := cmd.CombinedOutput()
-	if err != nil {
-		return err
+	options := &serial.Mode{
+		BaudRate: 115200,
+		Parity:   serial.NoParity,
+		DataBits: 8,
+		StopBits: serial.OneStopBit,
 	}
 
-	fmt.Println(string(b))
-	return nil
+	port, err := serial.Open(iface, options)
+	if err != nil {
+		port.Close()
+		return nil, err
+	}
+
+	devCtrl := &deviceController{
+		port:      port,
+		recvMsgCh: make(chan []byte),
+		status:    ControllerStatusReady,
+	}
+	go devCtrl.Run()
+
+	code, b, err := devCtrl.Do(1, []byte("init"))
+	if err != nil {
+		devCtrl.Close()
+		return nil, err
+	}
+
+	if code != 205 {
+		devCtrl.Close()
+		return nil, errors.New("invalid response error")
+	}
+
+	var initInformation map[string]interface{}
+	// b = []byte(`{"uuid":"etri-ZXRyaQ==","sname":"devicemanagera"}`)
+	fmt.Println(len(b))
+	err = json.Unmarshal(b, &initInformation)
+	if err != nil {
+		devCtrl.Close()
+		return nil, err
+	}
+
+	var ok bool
+	devCtrl.ctrlName, ok = initInformation["uuid"].(string)
+	if !ok {
+		devCtrl.Close()
+		return nil, errors.New("not imported uuid error")
+	}
+	devCtrl.serviceName, ok = initInformation["sname"].(string)
+	if !ok {
+		devCtrl.Close()
+		return nil, errors.New("not imported sname error")
+	}
+
+	return devCtrl, nil
 }

@@ -67,7 +67,7 @@ func Register(accessToken string) error {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"POST",
-		fmt.Sprintf("http://%s/%s", config.Params["edgeAddress"], "api/v2/agents"),
+		fmt.Sprintf("https://%s/%s", config.Params["edgeAddress"], "api/v2/agents"),
 		bytes.NewReader(b),
 	)
 	if err != nil {
@@ -173,8 +173,6 @@ func connect(consulAddr, mqttAddr, origin string) error {
 	if err != nil {
 		return err
 	}
-
-	
 
 	status = STATUS_CONNECTED
 	return nil

@@ -79,7 +79,7 @@ func connectCentrifuge(wsAddr string) error {
 				return
 			}
 			fmt.Println(cmd)
-			ctrl.Sync([]byte(cmd))
+			ctrl.Do(2, []byte(cmd))
 		}
 	})
 

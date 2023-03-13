@@ -83,7 +83,7 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			return
 		}
 
-		ctrl.Sync([]byte(cmd))
+		ctrl.Do(2, []byte(cmd))
 	}
 
 }

@@ -2,9 +2,8 @@ package devmanager
 
 import (
 	"context"
+	"log"
 	"strings"
-
-	"io"
 
 	"github.com/rjeczalik/notify"
 )
@@ -12,9 +11,9 @@ import (
 var ctx context.Context
 var cancel context.CancelFunc
 
-var onConnected func(e string) = nil
+var onConnected func(e DeviceControllerI) = nil
 
-func AddOnConnected(h func(e string)) {
+func AddOnConnected(h func(d DeviceControllerI)) {
 	onConnected = h
 }
 
@@ -45,29 +44,15 @@ func Watch() error {
 			return nil
 		case e := <-filter:
 			if strings.Contains(e.Path(), "/dev/ttyACM") || strings.Contains(e.Path(), "/dev/ttyUSB") {
-				go onConnected(e.Path())
+				d, err := discover(e.Path())
+				if err != nil {
+					log.Println(err)
+					continue
+				}
+				if onConnected != nil {
+					go onConnected(d)
+				}
 			}
 		}
-	}
-}
-
-func readMessage(reader io.Reader) (int, []byte, error) {
-	buf := make([]byte, 255)
-	b := make([]byte, 1)
-	len := 0
-
-	var err error
-	for {
-		_, err = reader.Read(b)
-		if err != nil {
-			return 254, nil, err
-		}
-
-		if b[0] == 255 {
-			return int(buf[0]), buf[1:len], nil
-		}
-
-		buf[len] = b[0]
-		len++
 	}
 }
