@@ -20,6 +20,7 @@ func AddDeviceController(ctrl devmanager.DeviceControllerI) {
 	ctrlMutex.Lock()
 	defer ctrlMutex.Unlock()
 	devCtrls[ctrl.Key()] = ctrl
+
 	log.Println("added ctrl:", devCtrls)
 	err := postController(ctrl)
 	if err != nil {
@@ -34,6 +35,10 @@ func GetDeviceController(key uint64) (devmanager.DeviceControllerI, error) {
 	}
 
 	return ctrl, nil
+}
+
+func GetDeviceControllers() map[uint64]devmanager.DeviceControllerI {
+	return devCtrls
 }
 
 func RemoveDeviceController(key uint64) {

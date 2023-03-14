@@ -105,10 +105,11 @@ func Connect() error {
 	}
 
 	resp, err := http.Post(
-		fmt.Sprintf("http://%s/api/v2/agents/%s", edgeAddress, id),
+		fmt.Sprintf("https://%s/api/v2/agents/%s", edgeAddress, id),
 		"application/json",
 		nil,
 	)
+
 	if err != nil {
 		return err
 	}
@@ -120,11 +121,7 @@ func Connect() error {
 		return err
 	}
 
-	// fmt.Println(body)
-	// wsAddr, ok := body["wsAddr"].(string)
-	// if !ok {
-	// 	return errors.New("invalid params")
-	// }
+	fmt.Println(body)
 
 	consulAddr, ok := body["consulAddr"].(string)
 	if !ok {
@@ -145,10 +142,9 @@ func Connect() error {
 	for i = 0; i < 10; i++ {
 		err := connect(consulAddr, mqttAddr, origin)
 		if err == nil {
-			err = nil
 			break
 		}
-		time.Sleep(time.Second * 3)
+		time.Sleep(time.Second * 2)
 	}
 
 	if err != nil {
@@ -159,10 +155,6 @@ func Connect() error {
 }
 
 func connect(consulAddr, mqttAddr, origin string) error {
-	// err := connectCentrifuge(wsAddr)
-	// if err != nil {
-	// 	return err
-	// }
 
 	err := connectConsul(consulAddr, origin)
 	if err != nil {

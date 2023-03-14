@@ -1,10 +1,12 @@
-package consul_api
+package consulapi
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -58,25 +60,47 @@ func Connect(consulAgent string) error {
 	return nil
 }
 
-// func Monitor(h func(string), ctx context.Context) error {
-// 	stopCh := make(chan struct{})
-// 	notificationCh, err := client.Agent().Monitor("", stopCh, &api.QueryOptions{})
-// 	if err != nil {
-// 		return err
-// 	}
+func GetStates() (map[string]bool, error) {
+	states := make(map[string]bool)
 
-// 	for {
-// 		select {
-// 		case param := <-notificationCh:
-// 			if h != nil {
-// 				h(param)
-// 			}
-// 		case <-ctx.Done():
-// 			stopCh <- struct{}{}
-// 			return nil
-// 		}
-// 	}
-// }
+	catalogs, meta, err := client.Catalog().Services(&api.QueryOptions{})
+	if err != nil {
+		return nil, err
+	}
+	glog.Info(meta)
+
+	for k, _ := range catalogs {
+		status, _, _ := client.Health().Checks(k, nil)
+		states[k] = strings.Compare(status.AggregatedStatus(), "passing") == 0
+	}
+
+	return states, nil
+}
+
+func GetStatus(name string) (string, error) {
+	s, _, err := client.Agent().AgentHealthServiceByID(name)
+	return s, err
+}
+
+func Monitor(h func(string), ctx context.Context) error {
+	stopCh := make(chan struct{})
+	notificationCh, err := client.Agent().Monitor("", stopCh, &api.QueryOptions{})
+	if err != nil {
+		return err
+	}
+
+	for {
+		select {
+		case param := <-notificationCh:
+			if h != nil {
+				h(param)
+			}
+		case <-ctx.Done():
+			stopCh <- struct{}{}
+			return nil
+		}
+	}
+}
 
 func registerEntity(name, endpoint string) (err error) {
 	agent := client.Agent()
@@ -93,6 +117,19 @@ func registerEntity(name, endpoint string) (err error) {
 		return
 	}
 
+	// server check the health
+	// service := &consulapi.AgentServiceRegistration{
+	// 	Name:    name,
+	// 	Port:    int(port_i),
+	// 	Address: host,
+	// 	Check: &consulapi.AgentServiceCheck{
+	// 		// Args:     []string{"curl", "localhost:8080"},
+	// 		HTTP:     endpoint,
+	// 		Timeout:  "10s",
+	// 		Interval: "10s",
+	// 	},
+	// }
+
 	// client report the health
 	entity := &api.AgentServiceRegistration{
 		Name:    name,
@@ -104,7 +141,7 @@ func registerEntity(name, endpoint string) (err error) {
 	}
 
 	if err = agent.ServiceRegister(entity); err != nil {
-		return err
+		return
 	}
 
 	// client.Agent().CheckRegister(&api.AgentCheckRegistration{

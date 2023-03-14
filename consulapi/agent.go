@@ -1,8 +1,7 @@
-package consul_api
+package consulapi
 
 import (
 	"etri-sfpoc-controller/model"
-	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -20,9 +19,9 @@ func RegisterAgent(agent model.Agent, endpoint string) error {
 	return nil
 }
 
-func DeregisterAgent(name string) {
-	client.Agent().ServiceDeregister(name)
+func DeregisterCtrl(name string) error {
 	glog.Infof("[ctrl %v] - deregistered.", name)
+	return client.Agent().ServiceDeregister(name)
 }
 
 func UpdateTTL(check func() (bool, error), name string) {
@@ -41,7 +40,6 @@ func update(check func() (bool, error), agent *api.Agent, name string) {
 		glog.Errorf("err=\"Check failed\" msg=\"%s\"", err.Error())
 		if agentErr := agent.FailTTL("service:"+name, err.Error()); agentErr != nil {
 			glog.Error(agentErr)
-			os.Exit(0)
 		}
 	} else {
 		if agentErr := agent.PassTTL("service:"+name, "healthy"); agentErr != nil {

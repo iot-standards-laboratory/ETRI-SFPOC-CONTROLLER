@@ -4,11 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"math/rand"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,7 +14,8 @@ import (
 )
 
 func getToken() uint8 {
-	return uint8(rand.Intn(253) + 1)
+	// return uint8(rand.Intn(253) + 1)
+	return 100
 }
 
 // GetToken generates a random token by a given length
@@ -58,7 +57,7 @@ func readMessage(reader io.ReadCloser) ([]byte, error) {
 }
 
 func initDiscoverDevice() error {
-	fs, err := ioutil.ReadDir("/dev")
+	fs, err := os.ReadDir("/dev")
 	if err != nil {
 		return err
 	}
@@ -71,7 +70,7 @@ func initDiscoverDevice() error {
 				continue
 			}
 			if onConnected != nil {
-				go onConnected(d)
+				onConnected(d)
 			}
 		}
 	}
@@ -80,9 +79,6 @@ func initDiscoverDevice() error {
 }
 
 func discover(iface string) (DeviceControllerI, error) {
-	log.Println("start discover")
-	defer log.Println("exit discover")
-
 	options := &serial.Mode{
 		BaudRate: 115200,
 		Parity:   serial.NoParity,
@@ -115,8 +111,6 @@ func discover(iface string) (DeviceControllerI, error) {
 	}
 
 	var initInformation map[string]interface{}
-	// b = []byte(`{"uuid":"etri-ZXRyaQ==","sname":"devicemanagera"}`)
-	fmt.Println(len(b))
 	err = json.Unmarshal(b, &initInformation)
 	if err != nil {
 		devCtrl.Close()
@@ -125,10 +119,12 @@ func discover(iface string) (DeviceControllerI, error) {
 
 	var ok bool
 	devCtrl.ctrlName, ok = initInformation["uuid"].(string)
+
 	if !ok {
 		devCtrl.Close()
 		return nil, errors.New("not imported uuid error")
 	}
+
 	devCtrl.serviceName, ok = initInformation["sname"].(string)
 	if !ok {
 		devCtrl.Close()

@@ -5,6 +5,7 @@ import (
 	"etri-sfpoc-controller/config"
 	"etri-sfpoc-controller/devmanager"
 	"etri-sfpoc-controller/model/cachestorage"
+	"etri-sfpoc-controller/mqtthandler"
 	"etri-sfpoc-controller/router"
 	"etri-sfpoc-controller/statmgmt"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"time"
 )
 
 // func makeDeviceController(port io.ReadWriter, did, dname, sname string) devmanager.DeviceControllerI {
@@ -49,7 +51,6 @@ func main() {
 	go router.NewRouter().Run(bindAddr)
 
 	statmgmt.Bootup()
-
 	if statmgmt.Status() == statmgmt.STATUS_DISCONNECTED {
 		err := statmgmt.Connect()
 		if err != nil {
@@ -61,7 +62,6 @@ func main() {
 		ctrl.AddOnError(func(e error) {
 			if e.Error() == "EOF" {
 				log.Println("EOF error!!")
-				ctrl.Close()
 			}
 		})
 
@@ -69,11 +69,31 @@ func main() {
 			cachestorage.RemoveDeviceController(key)
 		})
 
+		// add controller to cache and register to edge
 		cachestorage.AddDeviceController(ctrl)
+		// query controller status on init
+		mqtthandler.Subscribe(fmt.Sprintf("%s/%d/post", config.Params["id"], ctrl.Key()))
+		mqtthandler.Subscribe(fmt.Sprintf("%s/%d/get", config.Params["id"], ctrl.Key()))
 	})
 
 	go devmanager.Watch()
-	// go devManagerTest()
+
+	go func() {
+		ticker := time.NewTicker(time.Second * 5)
+		keyTemplate := fmt.Sprintf("%s/%%d/content/sensor", config.Params["id"])
+
+		for range ticker.C {
+			ctrls := cachestorage.GetDeviceControllers()
+			for _, ctrl := range ctrls {
+				_, b, err := ctrl.Do(1, []byte("sensor"))
+				if err != nil {
+					log.Println("error occur: ", err)
+				}
+
+				mqtthandler.Publish(fmt.Sprintf(keyTemplate, ctrl.Key()), b)
+			}
+		}
+	}()
 
 	waitInterrupt()
 	// do something before program exit

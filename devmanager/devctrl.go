@@ -2,11 +2,9 @@ package devmanager
 
 import (
 	"errors"
-	"fmt"
 	"hash/crc64"
 	"io"
 	"log"
-	"sync"
 	"time"
 )
 
@@ -36,7 +34,6 @@ type deviceController struct {
 	recvMsgCh   chan []byte
 	onError     func(err error)
 	onClose     func(key uint64)
-	done        sync.WaitGroup
 }
 
 func (ctrl *deviceController) Name() string {
@@ -54,7 +51,8 @@ func (ctrl *deviceController) ServiceName() string {
 func (ctrl *deviceController) Close() {
 	ctrl.status = ControllerStatusClosing
 	ctrl.port.Close()
-	ctrl.done.Wait()
+	close(ctrl.recvMsgCh)
+
 	if ctrl.onClose != nil {
 		ctrl.onClose(ctrl.Key())
 	}
@@ -69,39 +67,32 @@ func (ctrl *deviceController) AddOnClose(h func(key uint64)) {
 }
 
 func (ctrl *deviceController) Run() {
-	defer log.Println("ctrl", ctrl.ctrlName, "is stoped")
-	ctrl.done.Add(1)
-	defer ctrl.done.Done()
-
 	ctrl.status = ControllerStatusRunning
 
 	for ctrl.status != ControllerStatusClosing {
 		b, err := readMessage(ctrl.port)
 		if err != nil {
+			ctrl.Close()
 			return
 		}
+
 		ctrl.recvMsgCh <- b
 	}
 }
 
 func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error) {
-
 	msg, err := getMessage(code, getToken(), payload)
 	if err != nil {
 		return -1, nil, err
 	}
-
-	fmt.Printf("msg[0], msg[1], msg[2]: %d, %d, %d\n", msg[0], msg[1], msg[2])
-	fmt.Println("payload: ", string(payload))
 
 	_, err = ctrl.port.Write(msg)
 	if err != nil {
 		return -1, nil, err
 	}
 
-	ticker := time.NewTicker(2 * time.Second)
+	ticker := time.NewTicker(time.Second * 2)
 	defer ticker.Stop()
-
 	for i := 0; i < 5; i++ {
 		select {
 		case <-ticker.C:
@@ -116,7 +107,7 @@ func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error
 			}
 
 			if recvMsg[1] != msg[1] {
-				log.Println("retransmission command as invalid token")
+				log.Println("retransmission command as invalid token:", recvMsg[1])
 				_, err = ctrl.port.Write(msg)
 				if err != nil {
 					return -1, nil, err

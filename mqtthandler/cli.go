@@ -16,14 +16,14 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-const user = "etri"
-const passwd = "etrismartfarm"
+const user = "etrimqtt"
+const passwd = "fainal2311"
 
 var client mqtt.Client
 
 var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
+	prefixLen := len(config.Params["id"].(string))
 	if strings.HasSuffix(msg.Topic(), "/init") {
-		log.Println("init!!")
 		err := utils.CMD_Init()
 		if err != nil {
 			log.Fatalln(err)
@@ -36,7 +36,6 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	}
 
 	if strings.HasSuffix(msg.Topic(), "/reboot") {
-		log.Println("reboot!!")
 		err := utils.CMD_Reboot()
 		if err != nil {
 			log.Fatalln(err)
@@ -48,31 +47,42 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 		}()
 	}
 
-	ctrlKey := msg.Topic()[strings.Index(msg.Topic(), "/")+1:]
-	if ctrlKey[len(ctrlKey)-1] != 'c' {
-		return
-	}
-
-	obj := map[string]interface{}{}
-	err := json.Unmarshal(msg.Payload(), &obj)
-	if err != nil {
-		return
-	}
-
-	code, ok := obj["code"].(float64)
-	if !ok {
-		return
-	}
-
-	if code-2.0 < 0.001 {
-
-		ctrlKey = ctrlKey[:len(ctrlKey)-1]
-
-		cmd, ok := obj["cmd"].(string)
-		if !ok {
+	if strings.HasSuffix(msg.Topic(), "post") {
+		totalLen := len(msg.Topic())
+		ctrlKey := msg.Topic()[prefixLen+1 : totalLen-5]
+		nKey, err := strconv.ParseInt(ctrlKey, 0, 64)
+		if err != nil {
+			return
+		}
+		ctrl, err := cachestorage.GetDeviceController(uint64(nKey))
+		if err != nil {
+			log.Println(err)
 			return
 		}
 
+		var m_payload map[string]interface{}
+		err = json.Unmarshal(msg.Payload(), &m_payload)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		payload, err := json.Marshal(map[string]interface{}{
+			m_payload["path"].(string): m_payload["value"],
+		})
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		Publish(msg.Topic()[:totalLen-4]+"content/actuator", payload)
+		ctrl.Do(2, msg.Payload())
+
+	}
+
+	if strings.HasSuffix(msg.Topic(), "get") {
+		totalLen := len(msg.Topic())
+		ctrlKey := msg.Topic()[prefixLen+1 : totalLen-4]
 		nKey, err := strconv.ParseInt(ctrlKey, 0, 64)
 		if err != nil {
 			return
@@ -83,9 +93,18 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			return
 		}
 
-		ctrl.Do(2, []byte(cmd))
-	}
+		code, payload, err := ctrl.Do(1, msg.Payload())
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		if code != 205 {
+			fmt.Println("invalid response code error:", code)
+			return
+		}
 
+		Publish(msg.Topic()[:totalLen-3]+"content/"+string(msg.Payload()), payload)
+	}
 }
 
 func ConnectMQTT(mqttAddr string) error {
@@ -104,12 +123,15 @@ func ConnectMQTT(mqttAddr string) error {
 	opts.SetAutoReconnect(true)
 	opts.SetConnectRetryInterval(time.Duration(time.Second * 5))
 	opts.SetOnConnectHandler(func(c mqtt.Client) {
-		fmt.Println("connect!!")
 		id, ok := config.Params["id"]
 		if !ok {
 			os.Exit(-1)
 		}
-		err := Subscribe(fmt.Sprintf("%s/#", id))
+		err := Subscribe(fmt.Sprintf("%s/init", id))
+		if err != nil {
+			os.Exit(-1)
+		}
+		err = Subscribe(fmt.Sprintf("%s/reboot", id))
 		if err != nil {
 			os.Exit(-1)
 		}
