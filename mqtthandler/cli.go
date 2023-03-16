@@ -50,8 +50,10 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 	if strings.HasSuffix(msg.Topic(), "post") {
 		totalLen := len(msg.Topic())
 		ctrlKey := msg.Topic()[prefixLen+1 : totalLen-5]
-		nKey, err := strconv.ParseInt(ctrlKey, 0, 64)
+
+		nKey, err := strconv.ParseUint(ctrlKey, 0, 64)
 		if err != nil {
+			fmt.Println(err)
 			return
 		}
 		ctrl, err := cachestorage.GetDeviceController(uint64(nKey))
@@ -59,14 +61,12 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			log.Println(err)
 			return
 		}
-
 		var m_payload map[string]interface{}
 		err = json.Unmarshal(msg.Payload(), &m_payload)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-
 		payload, err := json.Marshal(map[string]interface{}{
 			m_payload["path"].(string): m_payload["value"],
 		})
@@ -76,14 +76,17 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 		}
 
 		Publish(msg.Topic()[:totalLen-4]+"content/actuator", payload)
-		ctrl.Do(2, msg.Payload())
 
+		if len(msg.Payload()) == 0 {
+			return
+		}
+		ctrl.Do(2, msg.Payload())
 	}
 
 	if strings.HasSuffix(msg.Topic(), "get") {
 		totalLen := len(msg.Topic())
 		ctrlKey := msg.Topic()[prefixLen+1 : totalLen-4]
-		nKey, err := strconv.ParseInt(ctrlKey, 0, 64)
+		nKey, err := strconv.ParseUint(ctrlKey, 0, 64)
 		if err != nil {
 			return
 		}
@@ -103,6 +106,10 @@ var f mqtt.MessageHandler = func(client mqtt.Client, msg mqtt.Message) {
 			return
 		}
 
+		if len(payload) == 0 {
+			fmt.Println("^^")
+			return
+		}
 		Publish(msg.Topic()[:totalLen-3]+"content/"+string(msg.Payload()), payload)
 	}
 }

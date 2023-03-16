@@ -1,6 +1,7 @@
 import os 
 import sys
 
+os.system('go build -o controller-app main.go')
 serviceTemplate = '''[Unit]
 Description=Run Smart Farm PoC Controller
 After=multi-user.target

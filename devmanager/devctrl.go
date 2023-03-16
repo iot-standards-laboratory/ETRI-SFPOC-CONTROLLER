@@ -5,6 +5,7 @@ import (
 	"hash/crc64"
 	"io"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,7 @@ type deviceController struct {
 	port        io.ReadWriteCloser
 	ctrlName    string
 	serviceName string
+	mutex       sync.Mutex
 	status      int
 	recvMsgCh   chan []byte
 	onError     func(err error)
@@ -85,6 +87,9 @@ func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error
 	if err != nil {
 		return -1, nil, err
 	}
+
+	ctrl.mutex.Lock()
+	defer ctrl.mutex.Unlock()
 
 	_, err = ctrl.port.Write(msg)
 	if err != nil {

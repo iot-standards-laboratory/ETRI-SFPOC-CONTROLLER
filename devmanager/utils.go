@@ -13,9 +13,13 @@ import (
 	"go.bug.st/serial"
 )
 
+var tkn = uint8(0)
+
 func getToken() uint8 {
-	// return uint8(rand.Intn(253) + 1)
-	return 100
+	tkn = (tkn + 1) % 250
+
+	return tkn + 1
+	// return 100
 }
 
 // GetToken generates a random token by a given length
@@ -48,6 +52,7 @@ func readMessage(reader io.ReadCloser) ([]byte, error) {
 		}
 
 		if b[0] == 255 {
+			buf.Write([]byte{'\n'})
 			return buf.Bytes(), nil
 		}
 
@@ -80,7 +85,7 @@ func initDiscoverDevice() error {
 
 func discover(iface string) (DeviceControllerI, error) {
 	options := &serial.Mode{
-		BaudRate: 115200,
+		BaudRate: 57600,
 		Parity:   serial.NoParity,
 		DataBits: 8,
 		StopBits: serial.OneStopBit,
