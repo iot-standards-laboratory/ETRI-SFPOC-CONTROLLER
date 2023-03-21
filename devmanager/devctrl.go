@@ -3,16 +3,18 @@ package devmanager
 import (
 	"errors"
 	"hash/crc64"
-	"io"
 	"log"
 	"sync"
 	"time"
+
+	"go.bug.st/serial"
 )
 
 type DeviceControllerI interface {
 	AddOnError(func(err error))
 	AddOnClose(func(key uint64))
 	Do(code uint8, payload []byte) (int, []byte, error)
+	ResetBuffer() error
 	Name() string
 	ServiceName() string
 	Key() uint64
@@ -28,7 +30,7 @@ const (
 )
 
 type deviceController struct {
-	port        io.ReadWriteCloser
+	port        serial.Port
 	ctrlName    string
 	serviceName string
 	mutex       sync.Mutex
@@ -82,6 +84,19 @@ func (ctrl *deviceController) Run() {
 	}
 }
 
+func (ctrl *deviceController) ResetBuffer() error {
+	err := ctrl.port.ResetInputBuffer()
+	if err != nil {
+		return err
+	}
+	err = ctrl.port.ResetOutputBuffer()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error) {
 	msg, err := getMessage(code, getToken(), payload)
 	if err != nil {
@@ -113,7 +128,7 @@ func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error
 
 			if recvMsg[1] != msg[1] {
 				log.Println("retransmission command as invalid token:", recvMsg[1])
-				_, err = ctrl.port.Write(msg)
+				ctrl.ResetBuffer()
 				if err != nil {
 					return -1, nil, err
 				}

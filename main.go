@@ -88,6 +88,10 @@ func main() {
 				_, b, err := ctrl.Do(1, []byte("sensor"))
 				if err != nil {
 					log.Println("error occur: ", err)
+					if ctrl.ResetBuffer() != nil {
+						ctrl.Close()
+					}
+
 				}
 
 				mqtthandler.Publish(fmt.Sprintf(keyTemplate, ctrl.Key()), b)

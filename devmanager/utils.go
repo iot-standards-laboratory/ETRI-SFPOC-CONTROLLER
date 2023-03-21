@@ -106,8 +106,16 @@ func discover(iface string) (DeviceControllerI, error) {
 
 	code, b, err := devCtrl.Do(1, []byte("init"))
 	if err != nil {
-		devCtrl.Close()
-		return nil, err
+		if devCtrl.ResetBuffer() != nil {
+			devCtrl.Close()
+			return nil, err
+		}
+
+		code, b, err = devCtrl.Do(1, []byte("init"))
+		if err != nil {
+			devCtrl.Close()
+			return nil, err
+		}
 	}
 
 	if code != 205 {
