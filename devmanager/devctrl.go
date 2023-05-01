@@ -17,6 +17,7 @@ type DeviceControllerI interface {
 	ResetBuffer() error
 	Name() string
 	ServiceName() string
+	ServiceID() string
 	Key() uint64
 	Run()
 	Close()
@@ -33,6 +34,7 @@ type deviceController struct {
 	port        serial.Port
 	ctrlName    string
 	serviceName string
+	serviceID   string
 	mutex       sync.Mutex
 	status      int
 	recvMsgCh   chan []byte
@@ -50,6 +52,10 @@ func (ctrl *deviceController) Key() uint64 {
 
 func (ctrl *deviceController) ServiceName() string {
 	return ctrl.serviceName
+}
+
+func (ctrl *deviceController) ServiceID() string {
+	return ctrl.serviceID
 }
 
 func (ctrl *deviceController) Close() {
@@ -105,18 +111,19 @@ func (ctrl *deviceController) Do(code uint8, payload []byte) (int, []byte, error
 
 	ctrl.mutex.Lock()
 	defer ctrl.mutex.Unlock()
-
+	ctrl.ResetBuffer()
 	_, err = ctrl.port.Write(msg)
 	if err != nil {
 		return -1, nil, err
 	}
 
-	ticker := time.NewTicker(time.Second * 2)
+	ticker := time.NewTicker(time.Second * 5)
 	defer ticker.Stop()
 	for i := 0; i < 5; i++ {
 		select {
 		case <-ticker.C:
 			log.Println("retransmission command as timeout")
+			ctrl.ResetBuffer()
 			_, err = ctrl.port.Write(msg)
 			if err != nil {
 				return -1, nil, err

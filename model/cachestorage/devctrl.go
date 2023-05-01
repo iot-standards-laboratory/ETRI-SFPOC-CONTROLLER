@@ -70,6 +70,7 @@ func postController(e devmanager.DeviceControllerI) error {
 		"agent_id":     id,
 		"key":          fmt.Sprintf("%s/%d", id, e.Key()),
 		"service_name": e.ServiceName(),
+		"service_id":   e.ServiceID(),
 	}
 
 	bytesBuf := &bytes.Buffer{}
@@ -103,6 +104,7 @@ func deleteController(e devmanager.DeviceControllerI) error {
 		"agent_id":     id,
 		"key":          fmt.Sprintf("%s/%d", id, e.Key()),
 		"service_name": e.ServiceName(),
+		"service_id":   e.ServiceID(),
 	}
 
 	bytesBuf := &bytes.Buffer{}

@@ -90,8 +90,9 @@ func main() {
 					log.Println("error occur: ", err)
 					if ctrl.ResetBuffer() != nil {
 						ctrl.Close()
+						return
 					}
-
+					return
 				}
 
 				mqtthandler.Publish(fmt.Sprintf(keyTemplate, ctrl.Key()), b)

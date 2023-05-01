@@ -144,5 +144,11 @@ func discover(iface string) (DeviceControllerI, error) {
 		return nil, errors.New("not imported sname error")
 	}
 
+	devCtrl.serviceID, ok = initInformation["sid"].(string)
+	if !ok {
+		devCtrl.Close()
+		return nil, errors.New("not imported sname error")
+	}
+
 	return devCtrl, nil
 }
