@@ -1,0 +1,12 @@
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/front
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/icudtl.dat
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/lib/libflutter_linux_gtk.so
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/AssetManifest.bin
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/kernel_blob.bin
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/NOTICES.Z
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/AssetManifest.json
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/shaders/ink_sparkle.frag
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/version.json
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/FontManifest.json
+/mnt/pudrive/pugit/pulab/projects/SFPOC/ETRI-SFPOC-CONTROLLER/front/build/linux/x64/debug/bundle/data/flutter_assets/fonts/MaterialIcons-Regular.otf

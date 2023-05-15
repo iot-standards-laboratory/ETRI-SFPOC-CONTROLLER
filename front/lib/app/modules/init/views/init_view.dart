@@ -55,7 +55,7 @@ class InitView extends GetView<InitController> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'[0-9a-zA-Z.:/]')),
+                          RegExp(r'[0-9a-zA-Z.://]')),
                       // for version 2 and greater youcan also use this
                       // FilteringTextInputFormatter.digitsOnly
                     ],
