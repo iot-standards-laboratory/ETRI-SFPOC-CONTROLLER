@@ -55,7 +55,7 @@ class InitView extends GetView<InitController> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(
-                          RegExp(r'[0-9a-zA-Z.:]')),
+                          RegExp(r'[0-9a-zA-Z.:/]')),
                       // for version 2 and greater youcan also use this
                       // FilteringTextInputFormatter.digitsOnly
                     ],
@@ -67,11 +67,7 @@ class InitView extends GetView<InitController> {
                       if (val!.isEmpty) {
                         return 'Edge Address는 필수사항입니다.';
                       }
-                      if (!RegExp(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])+(:$[0-9]{3,4,5})')
-                              .hasMatch(val) &&
-                          !RegExp(r'^[0-9a-zA-Z]').hasMatch(val)) {
-                        return '잘못된 주소 형식입니다..';
-                      }
+
                       return null;
                     },
                     onSaved: (val) {
