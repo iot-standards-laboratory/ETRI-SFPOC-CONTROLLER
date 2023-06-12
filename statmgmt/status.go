@@ -67,7 +67,7 @@ func Register(accessToken string) error {
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"POST",
-		fmt.Sprintf("https://%s/%s", config.Params["edgeAddress"], "api/v2/agents"),
+		fmt.Sprintf("%s/%s", config.Params["edgeAddress"], "api/v2/agents"),
 		bytes.NewReader(b),
 	)
 	if err != nil {
@@ -105,7 +105,7 @@ func Connect() error {
 	}
 
 	resp, err := http.Post(
-		fmt.Sprintf("https://%s/api/v2/agents/%s", edgeAddress, id),
+		fmt.Sprintf("%s/api/v2/agents/%s", edgeAddress, id),
 		"application/json",
 		nil,
 	)

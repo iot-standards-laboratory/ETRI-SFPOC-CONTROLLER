@@ -80,9 +80,8 @@ func postController(e devmanager.DeviceControllerI) error {
 		return err
 	}
 
-	resp, _ := http.Post(fmt.Sprintf("http://%s/api/v2/ctrls", edgeAddr), "application/json", bytesBuf)
+	resp, _ := http.Post(fmt.Sprintf("%s/api/v2/ctrls", edgeAddr), "application/json", bytesBuf)
 	if resp.StatusCode != 200 {
-
 		return errors.New("update failed error")
 	}
 	return nil
