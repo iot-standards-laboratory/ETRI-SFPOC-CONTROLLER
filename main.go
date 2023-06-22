@@ -27,9 +27,13 @@ var interrupt chan os.Signal
 
 func waitInterrupt() {
 	// waiting interrupt
+
 	interrupt = make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
-
+	go func() {
+		time.Sleep(time.Hour)
+		interrupt <- os.Interrupt
+	}()
 	<-interrupt
 	log.Println("receive interrupt")
 }
