@@ -51,7 +51,6 @@ func main() {
 	if !ok {
 		bindAddr = ":4000"
 	}
-
 	go router.NewRouter().Run(bindAddr)
 
 	statmgmt.Bootup()
