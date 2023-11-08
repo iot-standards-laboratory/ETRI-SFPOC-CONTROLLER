@@ -104,12 +104,20 @@ func Connect() error {
 		return errors.New("server address is invalid error")
 	}
 
-	resp, err := http.Post(
-		fmt.Sprintf("%s/api/v2/agents/%s", edgeAddress, id),
-		"application/json",
+	// send post to connect to edge
+
+	req, err := http.NewRequest(
+		"POST",
+		fmt.Sprintf("%s/api/v2/agents", edgeAddress),
 		nil,
 	)
+	if err != nil {
+		return err
+	}
 
+	req.Header.Add("agentId", id.(string))
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
